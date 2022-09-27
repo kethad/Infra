@@ -1,0 +1,6 @@
+---
+- name: "Playbook for Installing AWS CLI"
+  hosts: "{{ HOSTS }}"
+  become: yes
+  roles: 
+   - aws_cli
