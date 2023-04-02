@@ -1,0 +1,1377 @@
+I[IAWSTemplateFormatVersion: '2010-09-09'
+Description: This stack will creates infra pre-requisite resuoroces for Vault ECS Application
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Environment Name (DEV/QA/BETA/STG/PREPROD/PROD/DR)
+    AllowedValues: ['DEV', 'QA', 'BETA', 'PREPROD', 'PROD', 'DR']
+  Platform:
+    Type: String
+    Default: 'VAULT'
+    Description: Platform Name
+  AppID:
+    Type: String
+    Default: '38E79B25-A900-4FA9-A53B-B5AF470B96EE' 
+    Description: AppID
+  BU:
+    Type: String
+    Default: 'DJI'
+    Description: BU Name
+  SupportGroup:
+    Type: String
+    Default: 'IM-SPDJI-Index infrastructure'  
+    Description: SupportGroup Name  
+
+Mappings:
+  SubnetSelection:
+    DEV:
+      PrivSubnetList: subnet-58df9203,subnet-22b76e46,subnet-894214a4,subnet-19cd2f52
+    QA:
+      PrivSubnetList: subnet-1e182645,subnet-7910ef46,subnet-8de7a2e8,subnet-eef3a3e2,subnet-f57391be,subnet-f68380db
+    BETA:
+      PrivSubnetList: subnet-cf7aeb92,subnet-0ed22f3e46ebb28e4,subnet-da2eb3f5
+    PROD:
+      PrivSubnetList: subnet-82e4b3af,subnet-03a9d1b50ad722dc9,subnet-0acb5d243533f32a7
+    DR:
+      PrivSubnetList: subnet-0e50084b3f95eb986,subnet-0fa46c0ba7bf9cfca,subnet-072c5ed567ef0f9a1
+
+
+
+  KeyNames:
+    DEV:
+      Name: 'alias/DEV-VAULT-KEY-01' 
+    QA:
+      Name: 'alias/QA-VAULT-KEY-01' 
+    BETA:
+      Name: 'alias/BETA-VAULT-KEY-01'  
+    PROD:
+      Name: 'alias/PROD-VAULT-KEY-01'  
+    DR:
+      Name: 'alias/DR-VAULT-KEY-01'  
+  VPCNames:
+    DEV:
+      vpcid: vpc-3e24bf58
+    QA: 
+      vpcid: vpc-d65377b0
+    BETA:
+      vpcid: vpc-c597a5bd 
+    PROD:
+      vpcid: vpc-1c5ec57a
+    DR:
+      vpcid: vpc-0dac0071e5643ccb3 
+  EnvironmentMap:
+    DEV:
+      EnvNameLowercase: dev
+    QA:
+      EnvNameLowercase: qa
+    BETA:
+      EnvNameLowercase: beta
+    PROD:
+      EnvNameLowercase: prod
+    DR:
+      EnvNameLowercase: dr  
+
+  LoadbalancerCertArn:
+    DEV:
+      certarn: 'arn:aws:acm:us-east-1:699183880494:certificate/b4427011-fe60-42c6-becd-8d1e69444774'
+    QA:
+      certarn: 'arn:aws:acm:us-east-1:699183880494:certificate/b4427011-fe60-42c6-becd-8d1e69444774' 
+    BETA:
+      certarn: 'arn:aws:acm:us-east-1:699183880494:certificate/b4427011-fe60-42c6-becd-8d1e69444774' 
+    DR:
+      certarn: 'arn:aws:acm:us-west-2:897860998156:certificate/2eef65ea-4a72-4409-a780-0adfc7850d65' 
+    PROD:
+      certarn: 'arn:aws:acm:us-east-1:897860998156:certificate/b3f0b2eb-e8d9-4a05-aea5-eeea660ca88f'    
+
+Resources: 
+  Key:
+    Type: AWS::KMS::Key
+    Properties: 
+      Description: !Sub '${Platform} Database password encryption for ${Environment} environment'
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: 'DefaultKmsPolicy'
+        Statement:
+        - Sid: 'Enable root user permission'
+          Effect: 'Allow'
+          Principal:
+            AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+          Action:
+            - 'kms:*'
+          Resource: '*'
+      Tags:
+      - Key: Name 
+        Value: !Sub '${Environment}-${Platform}-KEY-01'
+      - Key: Owner
+        Value: !Ref 'Platform'
+      - Key: AppID
+        Value: !Ref 'AppID'
+      - Key: BU
+        Value: !Ref 'BU'
+      - Key: Environment
+        Value: !Ref 'Environment'
+      - Key: SupportGroup
+        Value: !Ref 'SupportGroup'
+      - Key: UsedFor
+        Value: 'Encrypt DB password'  
+  myalias:
+    DependsOn: Key
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !FindInMap
+        - KeyNames
+        - !Ref Environment
+        - Name
+      TargetKeyId: !Ref Key
+  VaultApacheLoadBalancerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${Environment}-${Platform}-APACHE-LB-SG-01'
+      GroupDescription: !Sub ${Platform} Apache ALB Security Group
+      VpcId: !FindInMap
+        - VPCNames
+        - !Ref Environment
+        - vpcid
+      Tags:
+      - Key: Name
+        Value: !Sub ${Environment}-${Platform}-APACHE-LB-SG-01
+      - Key: Owner
+        Value: !Ref Platform
+      - Key: AppID
+        Value: !Ref AppID
+      - Key: BU
+        Value: !Ref BU
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: SupportGroup
+        Value: !Ref SupportGroup
+      - Key: UsedFor
+        Value: Vault Apache load balancer security group
+  VaultApacheLoadBalancerSGIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow HTTPS
+      GroupId: !Ref VaultApacheLoadBalancerSG
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: '10.0.0.0/8'
+  VaultApacheLoadBalancerSGIngress1:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow HTTP
+      GroupId: !Ref VaultApacheLoadBalancerSG
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: '10.0.0.0/8'    
+  VaultApacheContainerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupName: !Sub '${Environment}-${Platform}-APACHE-CONTAINER-SG-02'
+      GroupDescription: !Sub ${Platform} Apache ALB Security Group
+      VpcId: !FindInMap
+        - VPCNames
+        - !Ref Environment
+        - vpcid
+      Tags:
+      - Key: Name
+        Value: !Sub ${Environment}-${Platform}-APACHE-CONTAINER-SG-02
+      - Key: Owner
+        Value: !Ref Platform
+      - Key: AppID
+        Value: !Ref AppID
+      - Key: BU
+        Value: !Ref BU
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: SupportGroup
+        Value: !Ref SupportGroup
+      - Key: UsedFor
+        Value: Container security group
+  VaultApacheContainerSGIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Ingress from Vault Apache ALB
+      GroupId: !Ref VaultApacheContainerSG
+      IpProtocol: tcp
+      FromPort: 8080
+      ToPort: 8081 
+      SourceSecurityGroupId: !Ref VaultApacheLoadBalancerSG
+  VaultWebLoadbalancerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${Environment}-${Platform}-WEB-LB-SG-03'
+      GroupDescription: !Sub ${Platform} Web ALB Security Group
+      VpcId: !FindInMap
+        - VPCNames
+        - !Ref Environment
+        - vpcid
+      Tags:
+      - Key: Name
+        Value: !Sub ${Environment}-${Platform}-WEB-LB-SG-03
+      - Key: Owner
+        Value: !Ref Platform
+      - Key: AppID
+        Value: !Ref AppID
+      - Key: BU
+        Value: !Ref BU
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: SupportGroup
+        Value: !Ref SupportGroup
+      - Key: UsedFor
+        Value: Vault web load balancer security group
+  VaultWebLoadbalancerSGIngress1:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Ingress for Vault Apache Web
+      GroupId: !Ref VaultWebLoadbalancerSG
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: '10.0.0.0/8'
+  VaultWebLoadbalancerSGIngress2:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Ingress for Vault Apache Web
+      GroupId: !Ref VaultWebLoadbalancerSG
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      SourceSecurityGroupId: !Ref VaultApacheContainerSG
+  VaultWebLoadbalancerSGIngress3:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow HTTPS
+      GroupId: !Ref VaultWebLoadbalancerSG
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: '10.0.0.0/8'    
+  VaultWebContainerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${Environment}-${Platform}-WEB-CONTAINER-SG-04'
+      GroupDescription:  !Sub ${Platform} web container security group
+      VpcId: !FindInMap
+        - VPCNames
+        - !Ref Environment
+        - vpcid
+      Tags:
+      - Key: Name
+        Value: !Sub ${Environment}-${Platform}-WEB-CONTAINER-SG-04
+      - Key: Owner
+        Value: !Ref Platform
+      - Key: AppID
+        Value: !Ref AppID
+      - Key: BU
+        Value: !Ref BU
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: SupportGroup
+        Value: !Ref SupportGroup
+      - Key: UsedFor
+        Value: Web container security group
+  VaultWebContainerSGIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Ingress for Vault Web Container SG
+      GroupId: !Ref VaultWebContainerSG
+      IpProtocol: tcp
+      FromPort: 8080
+      ToPort: 8081 
+      SourceSecurityGroupId: !Ref VaultWebLoadbalancerSG 
+  VaultEFSSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${Environment}-${Platform}-EFS-SG-05'
+      GroupDescription: !Sub ${Platform} EFS SG
+      VpcId: !FindInMap
+        - VPCNames
+        - !Ref Environment
+        - vpcid
+      Tags:
+      - Key: Name
+        Value: !Sub ${Environment}-${Platform}-EFS-SG-05
+      - Key: Owner
+        Value: !Ref Platform
+      - Key: AppID
+        Value: !Ref AppID
+      - Key: BU
+        Value: !Ref BU
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: SupportGroup
+        Value: !Ref SupportGroup
+      - Key: UsedFor
+        Value: Vault EFS security group
+  VaultEFSSGIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Ingress for Vault EFS
+      GroupId: !Ref VaultEFSSG
+      IpProtocol: tcp
+      FromPort: 2049
+      ToPort: 2049
+      SourceSecurityGroupId: !Ref VaultWebContainerSG
+  VaultEFSSGIngress1:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Ingress for Vault EFS
+      GroupId: !Ref VaultEFSSG
+      IpProtocol: tcp
+      FromPort: 2049
+      ToPort: 2049
+      CidrIp: '10.0.0.0/8'    
+  VaultHazelcastMCSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${Environment}-${Platform}-HAZELCAST-MC-LB-SG-06'
+      GroupDescription: !Sub ${Platform} Hazelcast loadbalancer
+      VpcId: !FindInMap
+        - VPCNames
+        - !Ref Environment
+        - vpcid
+      Tags:
+      - Key: Name
+        Value: !Sub ${Environment}-${Platform}-HAZELCAST-MC-LB-SG-06
+      - Key: Owner
+        Value: !Ref Platform
+      - Key: AppID
+        Value: !Ref AppID
+      - Key: BU
+        Value: !Ref BU
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: SupportGroup
+        Value: !Ref SupportGroup
+      - Key: UsedFor
+        Value: Vault Hazelcast SG
+  VaultHazelcastMCSGIngressHTTPS:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Ingress for Vault Hazelcast Load balancer
+      GroupId: !Ref VaultHazelcastMCSG
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: '10.0.0.0/8'
+  VaultHazelcastMCSGIngressHTTP:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Ingress for Vault Hazelcast Load balancer
+      GroupId: !Ref VaultHazelcastMCSG
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: '10.0.0.0/8'
+  VaultHazelcastContainerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${Environment}-${Platform}-HAZELCAST-MC-CONTAINER-SG-07'
+      GroupDescription: !Sub ${Platform} Hazelcast Container SG
+      VpcId: !FindInMap
+        - VPCNames
+        - !Ref Environment
+        - vpcid
+      Tags:
+      - Key: Name
+        Value: !Sub ${Environment}-${Platform}-HAZELCAST-MC-CONTAINER-SG-07
+      - Key: Owner
+        Value: !Ref Platform
+      - Key: AppID
+        Value: !Ref AppID
+      - Key: BU
+        Value: !Ref BU
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: SupportGroup
+        Value: !Ref SupportGroup
+      - Key: UsedFor
+        Value: Vault Hazelcast Container SG
+  VaultHazelcastContainerSGIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Ingress for VaultHazelcastContainer
+      GroupId: !Ref VaultHazelcastContainerSG
+      IpProtocol: tcp
+      FromPort: 8080
+      ToPort: 8081
+      SourceSecurityGroupId: !Ref VaultHazelcastMCSG
+  VaultHazelcastServerContainerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${Environment}-${Platform}-HAZELCAST-SERVER-CONTAINER-SG-08'
+      GroupDescription: !Sub ${Platform} Hazelcast Server Container
+      VpcId: !FindInMap
+        - VPCNames
+        - !Ref Environment
+        - vpcid
+      Tags:
+      - Key: Name
+        Value: !Sub ${Environment}-${Platform}-HAZELCAST-SERVER-CONTAINER-SG-08
+      - Key: Owner
+        Value: !Ref Platform
+      - Key: AppID
+        Value: !Ref AppID
+      - Key: BU
+        Value: !Ref BU
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: SupportGroup
+        Value: !Ref SupportGroup
+      - Key: UsedFor
+        Value: Vault Hazelcast Server Container
+  VaultHazelcastServerContainerSGIngress1:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Ingress for Vault Hazelcast Server Container
+      GroupId: !Ref VaultHazelcastServerContainerSG
+      IpProtocol: tcp
+      FromPort: 5701
+      ToPort: 5701
+      SourceSecurityGroupId: !Ref VaultWebContainerSG
+  VaultHazelcastServerContainerSGIngress2:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Ingress for Vault Hazelcast Server Container
+      GroupId: !Ref VaultHazelcastServerContainerSG
+      IpProtocol: tcp
+      FromPort: 8081
+      ToPort: 8081
+      SourceSecurityGroupId: !Ref VaultHazelcastServerContainerSG
+  VaultHazelcastServerContainerSGIngress3:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Ingress for Vault Hazelcast Server Container
+      GroupId: !Ref VaultHazelcastServerContainerSG
+      IpProtocol: tcp
+      FromPort: 5701
+      ToPort: 5701
+      SourceSecurityGroupId: !Ref VaultHazelcastServerContainerSG      
+  #Vault Apache Loadbalancer, Target Group, Listener, Listner rule
+  VaultApacheLoadBalancer:
+    DependsOn: VaultApacheLoadBalancerSG
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub '${Environment}-${Platform}-APACHE-ALB-01'
+      Scheme: internal
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: '180'
+        - Key: deletion_protection.enabled
+          Value: 'true'
+        - Key: access_logs.s3.enabled
+          Value: 'true'  
+        - Key: access_logs.s3.bucket
+          Value: 'prod-infra-elb-logs'  
+      Subnets: !Split [",", !FindInMap [ SubnetSelection, !Ref Environment, PrivSubnetList ] ]    
+      SecurityGroups:
+        - !Ref VaultApacheLoadBalancerSG
+      Tags:
+      - Key: Name
+        Value: !Sub '${Environment}-${Platform}-APACHE-ALB-01'
+      - Key: Owner
+        Value: !Ref 'Platform'
+      - Key: AppID
+        Value: !Ref 'AppID'
+      - Key: BU
+        Value: !Ref 'BU'
+      - Key: Environment
+        Value: !Ref 'Environment'
+      - Key: SupportGroup
+        Value: !Ref 'SupportGroup'
+      - Key: UsedFor
+        Value: 'Access application'
+  VaultApacheLoadBalancerDefaultTG:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${Environment}-${Platform}-APACHE-DEFAULT-TG-01' 
+      HealthCheckIntervalSeconds: 15
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 2
+      TargetType: ip
+      VpcId: !FindInMap
+        - VPCNames
+        - !Ref Environment
+        - vpcid
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60  
+      Tags:
+      - Key: Name
+        Value: !Sub '${Environment}-${Platform}-APACHE-DEFAULT-TG-01'
+      - Key: Owner
+        Value: !Ref 'Platform'
+      - Key: AppID
+        Value: !Ref 'AppID'
+      - Key: BU
+        Value: !Ref 'BU'
+      - Key: Environment
+        Value: !Ref 'Environment'
+      - Key: SupportGroup
+        Value: !Ref 'SupportGroup'
+      - Key: UsedFor
+        Value: 'Default target group'
+  # Vault Apache HTTPS Listener with certificate
+  VaultApacheListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn:
+      - VaultApacheLoadBalancer
+    Properties: 
+      DefaultActions:
+        - TargetGroupArn: !Ref 'VaultApacheLoadBalancerDefaultTG'
+          Type: 'forward'
+      LoadBalancerArn: !Ref 'VaultApacheLoadBalancer'
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-FS-1-2-Res-2019-08
+      Certificates:
+      - CertificateArn: !FindInMap
+        - LoadbalancerCertArn
+        - !Ref Environment
+        - certarn
+  VaultApachehttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn:
+      -  VaultApacheLoadBalancer 
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref 'VaultApacheLoadBalancerDefaultTG'
+          Type: 'forward'
+      LoadBalancerArn: !Ref 'VaultApacheLoadBalancer'
+      Port: 80
+      Protocol: HTTP      
+  VaultApacheTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${Environment}-${Platform}-APACHE-TG-02'
+      HealthCheckIntervalSeconds: 15
+      HealthCheckPath: /server-status
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: 8081
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      TargetType: ip
+      Port: 8080
+      Protocol: HTTPS
+      VpcId: !FindInMap
+        - VPCNames
+        - !Ref Environment
+        - vpcid  
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60 
+      Tags:
+      - Key: Name
+        Value: !Sub '${Environment}-${Platform}-APACHE-TG-02'
+      - Key: Owner
+        Value: !Ref 'Platform'
+      - Key: AppID
+        Value: !Ref 'AppID'
+      - Key: BU
+        Value: !Ref 'BU'
+      - Key: Environment
+        Value: !Ref 'Environment'
+      - Key: SupportGroup
+        Value: !Ref 'SupportGroup'
+      - Key: UsedFor
+        Value: 'Apache target group'    
+  VaultApacheListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - TargetGroupArn: !Ref 'VaultApacheTargetGroup'
+          Type: 'forward'
+      Conditions:
+        - Field: path-pattern
+          Values: ['/**']
+      ListenerArn: !Ref VaultApacheListener
+      Priority: 1
+  VaultApacheHttpListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - TargetGroupArn: !Ref 'VaultApacheTargetGroup'
+          Type: 'forward'
+      Conditions:
+        - Field: path-pattern
+          Values: ['/**']
+      ListenerArn: !Ref VaultApachehttpListener
+      Priority: 1    
+  # Vault Web Loadbalancer, Target group, Listener, Listener rule
+  VaultWebLoadBalancer:
+    DependsOn: VaultWebLoadbalancerSG
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${Environment}-${Platform}-WEB-ALB-02
+      Scheme: internal
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: '180'
+        - Key: deletion_protection.enabled 
+          Value: 'true'
+        - Key: access_logs.s3.enabled
+          Value: 'true' 
+        - Key: access_logs.s3.bucket
+          Value: 'prod-infra-elb-logs'
+      Subnets: !Split [",", !FindInMap [ SubnetSelection, !Ref Environment, PrivSubnetList] ]   
+      SecurityGroups: 
+        - !Ref VaultWebLoadbalancerSG
+      Tags:
+      - Key: Name
+        Value: !Sub '${Environment}-${Platform}-WEB-ALB-02'
+      - Key: Owner
+        Value: !Ref 'Platform'
+      - Key: AppID
+        Value: !Ref 'AppID'
+      - Key: BU
+        Value: !Ref 'BU'
+      - Key: Environment
+        Value: !Ref 'Environment'
+      - Key: SupportGroup
+        Value: !Ref 'SupportGroup'
+      - Key: UsedFor
+        Value: 'Access Vault Web application' 
+  VaultWebLoadBalancerDefaultTG:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${Environment}-${Platform}-WEB-DEFAULT-TG-03'
+      HealthCheckIntervalSeconds: 15
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 2
+      TargetType: ip
+      VpcId: !FindInMap
+        - VPCNames
+        - !Ref Environment
+        - vpcid
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60  
+      Tags:
+      - Key: Name
+        Value: !Sub '${Environment}-${Platform}-WEB-DEFAULT-TG-03'
+      - Key: Owner
+        Value: !Ref 'Platform'
+      - Key: AppID
+        Value: !Ref 'AppID'
+      - Key: BU
+        Value: !Ref 'BU'
+      - Key: Environment
+        Value: !Ref 'Environment'
+      - Key: SupportGroup
+        Value: !Ref 'SupportGroup'
+      - Key: UsedFor
+        Value: 'Default Target Group' 
+  VaultWebListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn:
+      -  VaultWebLoadBalancer 
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref 'VaultWebLoadBalancerDefaultTG'
+          Type: 'forward'
+      LoadBalancerArn: !Ref 'VaultWebLoadBalancer'
+      Port: 80
+      Protocol: HTTP
+  VaultWebSecureListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn:
+      - VaultApacheLoadBalancer
+    Properties: 
+      DefaultActions:
+        - TargetGroupArn: !Ref 'VaultWebLoadBalancerDefaultTG'
+          Type: 'forward'
+      LoadBalancerArn: !Ref 'VaultWebLoadBalancer'
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-FS-1-2-Res-2019-08
+      Certificates:
+      - CertificateArn: !FindInMap
+        - LoadbalancerCertArn
+        - !Ref Environment
+        - certarn
+  #     
+  VaultWebTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${Environment}-${Platform}-WEB-TG-04'
+      HealthCheckIntervalSeconds: 15
+      HealthCheckPath: /api/v1/system-status/
+      #HealthCheckPath: /health-checks
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: 8080
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      TargetType: ip
+      Port: 8080
+      Protocol: HTTP
+      VpcId: !FindInMap
+        - VPCNames
+        - !Ref Environment
+        - vpcid 
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60
+        - Key: stickiness.enabled
+          Value: 'true'
+        - Key: stickiness.type
+          Value: 'lb_cookie'
+        - Key: stickiness.lb_cookie.duration_seconds
+          Value: 86400  
+      Tags:
+      - Key: Name
+        Value: !Sub '${Environment}-${Platform}-WEB-TG-04'
+      - Key: Owner
+        Value: !Ref 'Platform'
+      - Key: AppID
+        Value: !Ref 'AppID'
+      - Key: BU
+        Value: !Ref 'BU'
+      - Key: Environment
+        Value: !Ref 'Environment'
+      - Key: SupportGroup
+        Value: !Ref 'SupportGroup'
+      - Key: UsedFor
+        Value: 'Vault Web Target Group'
+  VaultWebListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - TargetGroupArn: !Ref 'VaultWebTargetGroup'
+          Type: forward
+      Conditions:
+        - Field: path-pattern
+          Values: ['/**']
+      ListenerArn: !Ref VaultWebListener
+      Priority: 1
+  VaultWebSecureListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - TargetGroupArn: !Ref 'VaultWebTargetGroup'
+          Type: forward
+      Conditions:
+        - Field: path-pattern
+          Values: ['/**']
+      ListenerArn: !Ref VaultWebSecureListener
+      Priority: 1    
+  VaultHazelcastLoadBalancer:
+    DependsOn: VaultHazelcastMCSG
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${Environment}-${Platform}-HAZELCAST-MC-ALB-03
+      Scheme: internal
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: '180'
+        - Key: deletion_protection.enabled 
+          Value: 'true'
+        - Key: access_logs.s3.enabled
+          Value: 'true' 
+        - Key: access_logs.s3.bucket
+          Value: 'prod-infra-elb-logs'
+      Subnets: !Split [",", !FindInMap [ SubnetSelection, !Ref Environment, PrivSubnetList] ]   
+      SecurityGroups:
+        - !Ref VaultHazelcastMCSG
+      Tags:
+      - Key: Name
+        Value: !Sub '${Environment}-${Platform}-HAZELCAST-MC-ALB-03'
+      - Key: Owner
+        Value: !Ref 'Platform'
+      - Key: AppID
+        Value: !Ref 'AppID'
+      - Key: BU
+        Value: !Ref 'BU'
+      - Key: Environment
+        Value: !Ref 'Environment'
+      - Key: SupportGroup
+        Value: !Ref 'SupportGroup'
+      - Key: UsedFor
+        Value: 'Vault Hazelcast application' 
+  VaultHazelcastDefaultTG:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${Environment}-${Platform}-HAZELCAST-MC-DEF-TG-4'
+      HealthCheckIntervalSeconds: 150
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 120
+      HealthyThresholdCount: 2
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 2
+      TargetType: ip
+      VpcId: !FindInMap
+        - VPCNames
+        - !Ref Environment
+        - vpcid
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60  
+      Tags:
+      - Key: Name
+        Value: !Sub '${Environment}-${Platform}-HAZELCAST-MC-DEF-TG-04'
+      - Key: Owner
+        Value: !Ref 'Platform'
+      - Key: AppID
+        Value: !Ref 'AppID'
+      - Key: BU
+        Value: !Ref 'BU'
+      - Key: Environment
+        Value: !Ref 'Environment'
+      - Key: SupportGroup
+        Value: !Ref 'SupportGroup'
+      - Key: UsedFor
+        Value: 'Default Target Group'  
+  VaultHazelcastListenerhttp:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn:
+      -  VaultHazelcastLoadBalancer
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref 'VaultHazelcastDefaultTG'
+          Type: 'forward'
+      LoadBalancerArn: !Ref 'VaultHazelcastLoadBalancer'
+      Port: 80
+      Protocol: HTTP 
+  VaultHazelcastListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn:
+      - VaultHazelcastLoadBalancer
+    Properties: 
+      DefaultActions:
+        - TargetGroupArn: !Ref 'VaultHazelcastDefaultTG'
+          Type: 'forward'
+      LoadBalancerArn: !Ref 'VaultHazelcastLoadBalancer'
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-FS-1-2-Res-2019-08
+      Certificates:
+      - CertificateArn: !FindInMap
+        - LoadbalancerCertArn
+        - !Ref Environment
+        - certarn	            
+  VaultHazelcastTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${Environment}-${Platform}-HAZELCAST-MC-TG-5'
+      HealthCheckIntervalSeconds: 150
+      HealthCheckPath: /hazelcast-mancenter/health 
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: 8081
+      HealthCheckTimeoutSeconds: 120
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      TargetType: ip
+      Port: 8080
+      Protocol: HTTP
+      VpcId: !FindInMap
+        - VPCNames
+        - !Ref Environment
+        - vpcid 
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60
+      Tags:
+      - Key: Name
+        Value: !Sub '${Environment}-${Platform}-HAZELCAST-MC-TG-05'
+      - Key: Owner
+        Value: !Ref 'Platform'
+      - Key: AppID
+        Value: !Ref 'AppID'
+      - Key: BU
+        Value: !Ref 'BU'
+      - Key: Environment
+        Value: !Ref 'Environment'
+      - Key: SupportGroup
+        Value: !Ref 'SupportGroup'
+      - Key: UsedFor
+        Value: 'Vault Hazelcast Target Group'
+  VaultHazelcastRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - TargetGroupArn: !Ref 'VaultHazelcastTargetGroup'
+          Type: forward
+      Conditions:
+        - Field: path-pattern
+          Values: ['/hazelcast-mancenter/**']
+      ListenerArn: !Ref VaultHazelcastListener
+      Priority: 1
+  VaultHazelcastRulehttp:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - TargetGroupArn: !Ref 'VaultHazelcastTargetGroup'
+          Type: forward
+      Conditions:
+        - Field: path-pattern
+          Values: ['/hazelcast-mancenter/**']
+      ListenerArn: !Ref VaultHazelcastListenerhttp
+      Priority: 1   
+
+  ECSTaskExecutionRole1:
+    Type: AWS::IAM::Role
+    Properties: 
+      RoleName: !Sub '${Environment}-${Platform}-ECS-TASK-EXEC-ROLE-01'
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: 'Allow'
+          Principal: 
+            Service: [ecs-tasks.amazonaws.com] 
+          Action: ['sts:AssumeRole']
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+        - 'arn:aws:iam::897860998156:policy/PROD-WEB-ECS-TASK-EXEC-ROLE-DD-POLICY-1'        
+      Policies:
+      - PolicyName: !Sub '${Environment}-${Platform}-ECS-TASK-EXEC-ROLE-POLICY-01'
+        PolicyDocument:
+          Statement:
+          - Effect: 'Allow'
+            Action: 'kms:Decrypt'
+            Resource: !GetAtt 'Key.Arn' 
+          - Effect: 'Allow'
+            Action: 'ssm:GetParameters'
+            Resource: 
+              - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/${Platform}/JASYPT_ENCRYPTION_KEY'
+              #- !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/${Platform}/DB_JASYPT_ENCRYPTION_KEY'
+              #- !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/${Platform}/UTILS_JASYPT_ENCRYPTION_KEY'  
+              - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/${Platform}/DOT_CMS_DB_PASSWORD'
+              - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/${Platform}/DOTCMS_SAMLAUTH_KEYPASS_PASSPHRASE'
+              - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/${Platform}/DOTCMS_SAMLAUTH_STOREPASS_PASSPHRASE'
+              - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/${Platform}/OKTA_OAUTH2_CLIENT_ID'
+              - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/${Platform}/OKTA_OAUTH2_CLIENT_SECRET'
+              - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/${Platform}/ES_AUTH_BASIC_USER'
+              - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/${Platform}/ES_AUTH_BASIC_PASSWORD'
+      Tags:
+      - Key: Name
+        Value: !Sub '${Environment}-${Platform}-ECS-TASK-EXEC-ROLE-01'
+      - Key: Owner
+        Value: !Ref 'Platform'
+      - Key: AppID
+        Value: !Ref 'AppID'
+      - Key: BU
+        Value: !Ref 'BU'
+      - Key: Environment
+        Value: !Ref 'Environment'
+      - Key: SupportGroup
+        Value: !Ref 'SupportGroup'
+      - Key: UsedFor
+        Value: 'ECS Tasks Role'   
+
+  ECSTaskExecutionRole2:
+    Type: AWS::IAM::Role
+    Properties: 
+      RoleName: !Sub '${Environment}-${Platform}-ECS-TASK-ROLE-02'
+      AssumeRolePolicyDocument:
+        Statement: 
+        - Effect: 'Allow'
+          Principal: 
+            Service: [ecs-tasks.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess'
+      Policies:
+      - PolicyName: !Sub '${Environment}-${Platform}-ECS-TASK-EXEC-ROLE-POLICY-02'
+        PolicyDocument:
+          Statement:
+          - Effect: 'Allow'
+            Action:
+              - 's3:PutObject'
+              - 's3:PutObjectACL'
+            Resource:  
+              - 'arn:aws:s3:::spdji-prod-web-backup-files/*' 
+      Tags:
+      - Key: Name
+        Value: !Sub '${Environment}-${Platform}-ECS-TASK-EXEC-ROLE-02'
+      - Key: Owner
+        Value: !Ref 'Platform'
+      - Key: AppID
+        Value: !Ref 'AppID'
+      - Key: BU
+        Value: !Ref 'BU'
+      - Key: Environment
+        Value: !Ref 'Environment'
+      - Key: SupportGroup
+        Value: !Ref 'SupportGroup'
+      - Key: UsedFor
+        Value: 'ECS Tasks Role'    
+
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub '${Environment}-${Platform}-ECS-CLUSTER-01'
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+      - Key: Name
+        Value: !Sub '${Environment}-${Platform}-ECS-CLUSTER-01'
+      - Key: Owner
+        Value: !Ref 'Platform'
+      - Key: AppID
+        Value: !Ref 'AppID'
+      - Key: BU
+        Value: !Ref 'BU'
+      - Key: Environment
+        Value: !Ref 'Environment'
+      - Key: SupportGroup
+        Value: !Ref 'SupportGroup'
+      - Key: UsedFor
+        Value: 'ECS Cluster'  
+  # Private namespace for reference services
+  ServiceDiscoveryPrivateNamespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Name: !Sub        
+        - internal-${EnvLower}-vault-hz
+        - EnvLower: !FindInMap [EnvironmentMap, !Ref 'Environment', EnvNameLowercase]
+      Description: !Sub '${Environment} ${Platform} application service discovery'
+      Vpc: !FindInMap
+        - VPCNames
+        - !Ref Environment
+        - vpcid   
+
+  ECRREPO1: 
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: 'vault/vault-dotcms'
+      ImageTagMutability: IMMUTABLE
+      #Tagmmutability
+      RepositoryPolicyText:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Sid: AllowPushPull
+            Effect: Allow
+            Principal:
+              AWS:
+                - 'arn:aws:iam::299975258897:root' 
+                - 'arn:aws:iam::897860998156:role/DI-JENKINS-PROD-ECR-ROLE'
+            Action:
+              - "ecr:BatchCheckLayerAvailability"
+              - "ecr:BatchGetImage"
+              - "ecr:CompleteLayerUpload"
+              - "ecr:DescribeImages"
+              - "ecr:DescribeRepositories"
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:GetLifecyclePolicy"
+              - "ecr:InitiateLayerUpload"
+              - "ecr:ListImages"
+              - "ecr:PutImage"
+              - "ecr:UploadLayerPart"
+      LifecyclePolicy:
+       LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Remove untagged images over 1 day old",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 1
+                },
+                "action": { 
+                  "type": "expire" 
+                }
+              },
+              {
+                "rulePriority": 2,
+                "description": "Keep last 30 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 30
+              },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }       
+
+  ECRREPO2: 
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: 'vault/vault-apache'
+      ImageTagMutability: IMMUTABLE
+      #Tagmmutability
+      RepositoryPolicyText:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Sid: AllowPushPull
+            Effect: Allow
+            Principal:
+              AWS:
+                - 'arn:aws:iam::299975258897:root' 
+                - 'arn:aws:iam::897860998156:role/DI-JENKINS-PROD-ECR-ROLE'
+            Action:
+              - "ecr:BatchCheckLayerAvailability"
+              - "ecr:BatchGetImage"
+              - "ecr:CompleteLayerUpload"
+              - "ecr:DescribeImages"
+              - "ecr:DescribeRepositories"
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:GetLifecyclePolicy"
+              - "ecr:InitiateLayerUpload"
+              - "ecr:ListImages"
+              - "ecr:PutImage"
+              - "ecr:UploadLayerPart"
+      LifecyclePolicy:
+       LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Remove untagged images over 1 day old",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 1
+                },
+                "action": { 
+                  "type": "expire" 
+                }
+              },
+              {
+                "rulePriority": 2,
+                "description": "Keep last 30 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 30
+              },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }       
+
+  ECRREPO3: 
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: 'vault/vault-apache-maintanance'
+      ImageTagMutability: IMMUTABLE
+      #Tagmmutability
+      RepositoryPolicyText:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Sid: AllowPushPull
+            Effect: Allow
+            Principal:
+              AWS:
+                - 'arn:aws:iam::299975258897:root' 
+                - 'arn:aws:iam::897860998156:role/DI-JENKINS-PROD-ECR-ROLE'
+            Action:
+              - "ecr:BatchCheckLayerAvailability"
+              - "ecr:BatchGetImage"
+              - "ecr:CompleteLayerUpload"
+              - "ecr:DescribeImages"
+              - "ecr:DescribeRepositories"
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:GetLifecyclePolicy"
+              - "ecr:InitiateLayerUpload"
+              - "ecr:ListImages"
+              - "ecr:PutImage"
+              - "ecr:UploadLayerPart"
+      LifecyclePolicy:
+       LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Remove untagged images over 1 day old",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 1
+                },
+                "action": { 
+                  "type": "expire" 
+                }
+              },
+              {
+                "rulePriority": 2,
+                "description": "Keep last 30 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 30
+              },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }       
+
+  ECRREPO4: 
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: 'vault/hazelcast-server'
+      ImageTagMutability: IMMUTABLE
+      #Tagmmutability
+      RepositoryPolicyText:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Sid: AllowPushPull
+            Effect: Allow
+            Principal:
+              AWS:
+                - 'arn:aws:iam::299975258897:root' 
+                - 'arn:aws:iam::897860998156:role/DI-JENKINS-PROD-ECR-ROLE'
+            Action:
+              - "ecr:BatchCheckLayerAvailability"
+              - "ecr:BatchGetImage"
+              - "ecr:CompleteLayerUpload"
+              - "ecr:DescribeImages"
+              - "ecr:DescribeRepositories"
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:GetLifecyclePolicy"
+              - "ecr:InitiateLayerUpload"
+              - "ecr:ListImages"
+              - "ecr:PutImage"
+              - "ecr:UploadLayerPart"
+      LifecyclePolicy:
+       LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Remove untagged images over 1 day old",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 1
+                },
+                "action": { 
+                  "type": "expire" 
+                }
+              },
+              {
+                "rulePriority": 2,
+                "description": "Keep last 30 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 30
+              },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }                   
+
+Outputs:
+  KMSKey:
+    Description: 'Vault KMS key ARN'
+    Value: !GetAtt 'Key.Arn'
+  VaultApacheLoadBalancerSG:
+    Description: 'Vault Apache ALB Security Group'
+    Value: !GetAtt 'VaultApacheLoadBalancerSG.GroupId' 
+  VaultApacheContainerSG:
+    Description: 'Vault Container ALB Security Group' 
+    Value: !GetAtt 'VaultApacheContainerSG.GroupId' 
+  VaultWebLoadbalancerSG:
+    Description: 'Vault Web ALB Security Group' 
+    Value: !GetAtt 'VaultWebLoadbalancerSG.GroupId'
+  VaultWebContainerSG:
+    Description: 'Vault web container security group'
+    Value: !GetAtt 'VaultWebContainerSG.GroupId' 
+  VaultEFSSG:
+    Description: 'Vault EFS SG'
+    Value: !GetAtt 'VaultEFSSG.GroupId' 
+  VaultHazelcastMCSG:
+    Description: 'Vault Hazelcast loadbalancer'
+    Value: !GetAtt 'VaultHazelcastMCSG.GroupId' 
+  VaultHazelcastContainerSG:
+    Description: Hazelcast Container SG'
+    Value: !GetAtt 'VaultHazelcastContainerSG.GroupId'
+  VaultHazelcastServerContainerSG:
+    Description: 'Vault Hazelcast Server Container' 
+    Value: !GetAtt 'VaultHazelcastServerContainerSG.GroupId'  
+  VaultApacheLoadBalancer:
+    Description: 'VaultApacheLoadBalancer DNS Name'
+    Value: !GetAtt 'VaultApacheLoadBalancer.DNSName'
+  VaultWebLoadBalancer:
+    Description: 'VaultWebLoadBalancer DNS Name'
+    Value: !GetAtt 'VaultWebLoadBalancer.DNSName'
+  VaultHazelcastLoadBalancer:
+    Description: 'VaultHazelcastLoadBalancer DNS Name'
+    Value: !GetAtt 'VaultHazelcastLoadBalancer.DNSName' 
+  ECSTaskExecutionRole1:
+    Description: 'The ARN of the ECS Task Execution Role'
+    Value: !GetAtt 'ECSTaskExecutionRole1.Arn'
+  ECSTaskExecutionRole2:
+    Description: 'The ARN of the ECS Task Role'
+    Value: !GetAtt 'ECSTaskExecutionRole2.Arn' 
+  ECSCluster:
+    Description: 'Name of the ECS Cluster'
+    Value: !Ref 'ECSCluster'   
+  ECRREPO1:
+    Description: 'ARN of ECR1'
+    Value: !GetAtt 'ECRREPO1.Arn' 
+  ECRREPO2:
+    Description: 'ARN of ECR2'
+    Value: !GetAtt 'ECRREPO2.Arn'  
+  ECRREPO3:
+    Description: 'ARN of ECR3'
+    Value: !GetAtt 'ECRREPO3.Arn'
+  ECRREPO4:
+    Description: 'ARN of ECR4'
+    Value: !GetAtt 'ECRREPO4.Arn'  
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+
+
+        
+      
+
+             
+
+
+
+
+
+
+
+
+                                     
+
+
+
+
