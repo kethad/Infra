@@ -1,0 +1,382 @@
+pipeline {
+    
+    //agent { label ' USE1-SLAVE-01 '}
+    agent { label ' USE1-SLAVE-01 || USW2-SLAVE-01 '}
+    //agent { label "${params.Slave}" }
+    stages {
+    
+    
+        stage('RDS-Parameters-Echo') {
+            
+             steps {
+                
+                echo " ${params.Environment} ${params.REGION} ${params.Database} ${params.STAGES} ${Snapshot_ARNs} ${EngineVersion} ${params.BuildNumber} ${params.Slave}  ${Restore_Environment} "
+                 
+             }
+         }
+        stage('RDSCreation') {
+            when {
+                expression { params.STAGES == 'RDSCreation'  }
+            }
+            
+            steps {
+               echo "${params.STAGES} is the Selected Stage"
+               rdscft()
+               stackvars()
+               audit()
+               rgn()
+               
+               //RDSMaster Random Password generation
+               echo "executing randompwd function"
+               sh " cd ${JENKINS_HOME}/workspace/${Job_Name}/rds/ ;chmod +x random_passwd.py ;./random_passwd.py ${envapp} ${build_number} "
+               randompwd()
+               
+               sh "aws cloudformation create-stack --stack-name ${stackname} --template-body ${TemplateName} --parameters ParameterKey=BuildNumber,ParameterValue=${build_number} ParameterKey=Environment,ParameterValue=${params.Environment} ParameterKey=Database,ParameterValue=${params.Database} ParameterKey=DBGlobalClusterIdentifier,ParameterValue=${DBGlobalClusterIdentifier} ParameterKey=DBClusterIdentifier,ParameterValue=${DBClusterIdentifier} ParameterKey=DBInstanceIdentifier1,ParameterValue=${DBInstanceIdentifier1} ParameterKey=DBInstanceIdentifier2,ParameterValue=${DBInstanceIdentifier2}  ParameterKey=DBPassword,ParameterValue=${randompwd} --capabilities CAPABILITY_NAMED_IAM --region '${region}' --tags Key=Name,Value=${stackname} Key=Environment,Value=${params.Environment} Key=Owner,Value=${params.Database} Key=AppID,Value=${appid} Key=BU,Value=DJI | tr -d {} | awk NF | awk '{print \$2}' > /var/tmp/${envapp}-${build_number}  " 
+               STID()
+               echo "${STID} is StackID outside STID Function"
+               sh " aws cloudformation wait stack-create-complete --region ${region} --stack-name ${STID}  "
+               sh " aws cloudformation describe-stack-events --stack-name  ${stackname} --region ${region} "
+               
+               //AddRegion with Tags script
+               sh "sudo chmod +x ${JENKINS_HOME}/workspace/${Job_Name}/rds/dr_add_region_mdb_aurora_postg.sh"
+               sh " cd ${JENKINS_HOME}/workspace/${Job_Name}/rds ; ./dr_add_region_mdb_aurora_postg.sh ${DRDBClusterIdentifier} ${DRDBInstanceIdentifier} ${DRDBInstanceIdentifier2} ${stackname} ${region} ${envapp} ${params.Environment} ${params.Database} ${appid} ${build_number}"
+                
+                //DynamoDB-Table-Update
+                echo "Going to execute the Wrapper shell script to update the Prod DynamoDB table"
+                sh " sudo chmod +x ${JENKINS_HOME}/workspace/${Job_Name}/rds/mysql_postgresql_prod_wrapper.sh "
+                sh "${JENKINS_HOME}/workspace/${Job_Name}/rds/mysql_postgresql_prod_wrapper.sh ${stackname}  ${envapp} ${build_number} ${BUILD_USER_MAIL_ID} ${region} ${DRDBClusterIdentifier} ${enginetype} "
+                rdsstackcrvars()
+                }
+            }
+            
+        
+        stage('RDSCreationFromSnapshot') {
+            when {
+                expression { params.STAGES == 'RDSCreationFromSnapshot'  }
+            }
+            
+            steps {
+               echo "${params.STAGES} is the Selected Stage"
+               rdscft()
+               snapshot_vars()
+               audit()
+               rgn()
+	       restore_env()
+               echo "${BUILD_USER} is Build_User"
+               echo "${BUILD_USER_MAIL_ID} is Build_User_Mail_ID"
+               echo "${EngineVersion} ${Snapshot_ARN}"
+               
+               sh "aws cloudformation create-stack --stack-name ${stackname} --template-body ${TemplateName} --parameters ParameterKey=BuildNumber,ParameterValue=${build_number} ParameterKey=Environment,ParameterValue=${restore_env} ParameterKey=Database,ParameterValue=${params.Database} ParameterKey=DBGlobalClusterIdentifier,ParameterValue=${DBGlobalClusterIdentifier} ParameterKey=DBClusterIdentifier,ParameterValue=${DBClusterIdentifier} ParameterKey=DBInstanceIdentifier1,ParameterValue=${DBInstanceIdentifier1} ParameterKey=DBInstanceIdentifier2,ParameterValue=${DBInstanceIdentifier2} ParameterKey=DBSnapshotIdentifier,ParameterValue=${Snapshot_ARN} ParameterKey=EngineVersion,ParameterValue=${EngineVersion} --capabilities CAPABILITY_NAMED_IAM --region '${region}' --tags Key=Name,Value=${stackname} Key=Environment,Value=${restore_env} Key=Owner,Value=${params.Database} Key=AppID,Value=${appid} Key=BU,Value=DJI | tr -d {} | awk NF | awk '{print \$2}' > /var/tmp/${envapp}-${build_number}  " 
+               STID()
+               echo "${STID} is StackID outside STID Function"
+               sh " cd ${JENKINS_HOME}/workspace/${Job_Name}/rds/ ;chmod +x cf_status_check.sh ; ./cf_status_check.sh ${stackname} ${region} "
+               //sh " aws cloudformation wait stack-create-complete --region '${region}' --stack-name ${STID}  "
+               sh " aws cloudformation describe-stack-events --stack-name  ${stackname} --region '${region}' "
+               
+               //AddRegion with Tags script
+               sh "sudo chmod +x ${JENKINS_HOME}/workspace/${Job_Name}/rds/add_region_aurora_postg_snapshot.sh"
+               sh " cd ${JENKINS_HOME}/workspace/${Job_Name}/rds ; ./add_region_aurora_postg_snapshot.sh ${DRDBClusterIdentifier} ${DRDBInstanceIdentifier} ${DRDBInstanceIdentifier2} ${stackname} ${region} ${envapp} ${restore_env} ${params.Database} ${appid} ${build_number} ${DBClusterIdentifier} ${DBGlobalClusterIdentifier}"
+               
+               //DynamoDB-Table-Update
+                echo "Going to execute the Wrapper shell script to update the Prod DynamoDB table"
+                sh " sudo chmod +x ${JENKINS_HOME}/workspace/${Job_Name}/rds/mysql_postgresql_prod_wrapper.sh "
+                sh "${JENKINS_HOME}/workspace/${Job_Name}/rds/mysql_postgresql_prod_wrapper.sh ${stackname}  ${envapp} ${build_number} ${BUILD_USER_MAIL_ID} ${region} ${DRDBClusterIdentifier} ${enginetype} "
+                rdsstackcrvars()
+                
+                //Flip DNS Weight if required based on Region
+                sh "cd ./rds; chmod +x py3ManageDNSwZone.py py3reportRoute53Records_prod.py correct_dns_weight.py"             
+	        sh "./rds/correct_dns_weight.py ${restore_env} ${params.REGION} ${params.Database}"
+                
+                }
+            }
+        
+        stage('RDS-DNS-Update') {
+            when {
+                expression { params.STAGES == 'RDSDNSUpdate'  }
+            }
+            
+            steps {
+               echo "${params.STAGES} is the Selected Stage"
+               rdscft()
+               stackvars()
+               audit()
+               rgn()
+               
+               sh "cd ${JENKINS_HOME}/workspace/${Job_Name}/rds/ ; sudo chmod +x RetrieveRDSDNS.py RetrieveBuildInfo.py UpdateRDSDNS.py"
+               sh "ansible-playbook -i ${JENKINS_HOME}/workspace/${Job_Name}/rds/prod_inventory ${JENKINS_HOME}/workspace/${Job_Name}/rds/mysql_postgresql_prod_rds_dns.yml -e envapp=${envapp} -e build_number=${build_number} -e enginetype=${enginetype}"
+               rdsdnsupdate()
+               
+               //sh "ansible-playbook -i /local/apps/jenkins/scripts/rds_dns/ips /local/apps/jenkins/scripts/rds_dns/rds_dns.yml -e envapp=${envapp} -e build_number=${build_number} "
+                }
+            }
+            
+        stage('RDSDeletion') {
+            when {
+              expression { params.STAGES == 'RDSDeletion' }
+            }
+            steps {
+                stackvars()
+                audit()
+                rgn()
+                
+           
+                sh "cd ${JENKINS_HOME}/workspace/${Job_Name}/rds ; chmod +x featch_Aurora_RDS_Details.py py3ManageDNSwZone.py py3reportRoute53Records_prod.py Aurora_PostgreSQL_MySQL_decommission.sh UpdateBuildState.py"
+                sh "./rds/Aurora_PostgreSQL_MySQL_decommission.sh ${params.Environment} ${params.Database} ${build_number} ${BUILD_USER_MAIL_ID} ${envapp} "
+                rdsdelvars()
+                }
+            }
+         }
+
+
+  post {
+        failure {
+        
+                 mail to: 'sparrowsupport@spglobal.com,IndexInfraMBX@spglobal.com,IndexInfraNotifications@spglobal.com',
+                 subject: "SPDJI RDSStack: New ${params.Environment} RDS Deployment Failed for ${params.Database} APP for Build Number ${build_number}",
+                 body: "New RDS Deployment Failed for ${params.Environment} Environment ${params.Database} APP, for more details click on the url ${env.BUILD_URL}console"
+                
+        }
+        
+        success {
+          
+           script {
+             if ( params.STAGES == 'RDSCreation' ) {
+                
+                 mail to: 'sparrowsupport@spglobal.com,IndexInfraMBX@spglobal.com,IndexInfraNotifications@spglobal.com',
+                 subject: "SPDJI RDSStack: New ${params.Environment} RDS Deployment Completed for ${params.Database} APP with BuildNumber ${build_number}",
+                 body: "${rdsstackcrvars}"
+                 
+                 mail to: 'IndexInfraMBX@spglobal.com',
+                 subject: "SPDJI RDSStack RDSMaster Password of: ${params.Environment} Environment ${params.Database} APP with BuildNumber ${build_number} ",
+                 body: "${randompwd} is random password for ${params.Environment} ${params.Database} APP with BuildNumber ${build_number}"
+           
+               } else if (  params.STAGES == 'RDSDeletion' ) {
+              
+                   mail to: 'sparrowsupport@spglobal.com,IndexInfraMBX@spglobal.com,IndexInfraNotifications@spglobal.com',
+                   subject: "SPDJI RDSStack: New ${params.Environment} RDS Decommission is Completed for ${params.Database} APP with BuildNumber ${build_number} ",
+                   body: "${rdsdelvars}" 
+               
+               } else if (  params.STAGES == 'RDSDNSUpdate' ) {
+              
+                   mail to: 'sparrowsupport@spglobal.com,IndexInfraMBX@spglobal.com,IndexInfraNotifications@spglobal.com',
+                   subject: "SPDJI RDSStack: New ${params.Environment} RDSDNSUpdate Completed for ${params.Database} APP with BuildNumber ${build_number} - Records and EndPoints details are in mail",
+                   body: "${rdsdnsupdate}" 
+               
+               } else if (  params.STAGES == 'RDSCreationFromSnapshot' ) {
+              
+                   mail to: 'sparrowsupport@spglobal.com,IndexInfraMBX@spglobal.com,IndexInfraNotifications@spglobal.com',
+                   subject: "SPDJI RDSStack: New ${restore_env} RDSCreationFromSnapshot Completed for ${params.Database} APP with BuildNumber ${build_number} ",
+                   body: "${rdsstackcrvars}" 
+               
+               } else {
+                   mail to: 'sparrowsupport@spglobal.com,IndexInfraMBX@spglobal.com,IndexInfraNotifications@spglobal.com',
+                   subject: "SPDJI RDSStack: Please provide valid Parameters for: ${params.Environment} Environment ${params.Database} APP",
+                   body: "SPDJI RDSStack: Please provide valid Parameters for: ${params.Environment} Environment ${params.Database} APP"
+               
+               }
+           }
+        }
+    }  
+
+
+}
+          
+        void rdscft() {
+            script {
+                        if ( params.REGION == 'USE1' && params.STAGES == 'RDSCreation' ) {
+                            TemplateName = "file://rds/JenkinsFiles/prod-idx-rds.yml"
+                            echo "${TemplateName} is the cloudformation template name as per the Region Input"
+                        }  else if (  params.REGION == 'USE1' && params.STAGES == 'RDSCreationFromSnapshot' ) {
+                           TemplateName = "file://rds/JenkinsFiles/prod-idx-rds-snapshot.yml"
+                           echo "${TemplateName} is the cloudformation template name as per the Region Input"
+                        }
+                           else {
+                           echo "YOU MUST SELECT THE ONE OF THE APP NAME from the Database Variable"
+                        }
+                       }
+                      }
+                      
+        
+        void rgn() {
+            script {
+                        if ( params.REGION == 'USE1' ) {
+                              RGN="VA"
+                              region="us-east-1"
+                              echo "${RGN} is Short form of North Virginia"
+                        }  else if (  params.REGION == 'USW2' ) {
+                             RGN="OR"
+                             region="us-west-2"
+                             echo "${RGN} is Short form of Oregon"
+                        }
+                          
+                  }
+       }
+        
+        
+        
+        void randompwd() { 
+            
+          randompwd = readFile("${JENKINS_HOME}/workspace/${Job_Name}/rds/random_pass-${envapp}-${build_number}")
+          //echo "${randompwd} is random password"
+        }
+        
+        void STID() { 
+            
+          STID = readFile("/var/tmp/${envapp}-${build_number}")
+          echo "${STID} is StackID inside STID Function"
+        }
+        
+        
+        void rdsstackcrvars() { 
+            
+          rdsstackcrvars = readFile("${JENKINS_HOME}/workspace/${Job_Name}/rds/${envapp}.cfvars.txt")
+          echo "${rdsstackcrvars} are rdsvars inside rdsstackcrvars Function"
+        }
+        
+        
+       void rdsdelvars() { 
+            
+          rdsdelvars = readFile("${JENKINS_HOME}/workspace/${Job_Name}/${params.Environment}-${params.Database}-${build_number}.sh")
+          echo "${rdsdelvars} are Aurora/mysql RDS Decommission job RDS details"
+        } 
+        
+        void rdsdnsupdate() { 
+            
+          rdsdnsupdate = readFile("${JENKINS_HOME}/workspace/${Job_Name}/rds/${envapp}.rdsdnsupdate.txt")
+          echo "${rdsdnsupdate} are rdsdnsupdate fileoutput inside rdsdnsupdate Function"
+        }
+        
+        void audit() {
+             script {
+                  wrap([$class: 'BuildUser']) {
+                      BUILD_USER="${BUILD_USER}"
+                      //echo "${BUILD_USER} is build user name"
+                      BUILD_USER_MAIL_ID="${BUILD_USER_EMAIL}"
+                      //echo "${BUILD_USER_EMAIL} is build user mail id"
+                  }  
+       
+             }
+        }
+        
+        
+        void stackvars() {
+            script {
+                        
+                      if ( params.BuildNumber == '' ){  
+                          rgn()
+                          build_number="${currentBuild.number}"
+                          envapp="${params.Environment}-${params.REGION}-${params.Database}"
+                          echo "${envapp} is the Enviroment-Region-APPName"
+                          echo "${build_number} is defaut buildnumber of the job"
+                          stackname="${envapp}-RDS-CF-Stack-${build_number}"
+                          echo "${stackname} is the STACKNAME"
+                          //dbusername="rdsmstr"
+                          //echo "${dbusername} is dbusername"
+                          dbpassword="Rdsmstr_4378"
+                          //echo "${dbpassword} is dbpassword"
+                          DBClusterIdentifier="${envapp}-aurora-postgresql-cluster-${build_number}"
+                          echo "${DBClusterIdentifier} is db cluster identifier"
+                          DBGlobalClusterIdentifier="${params.Environment}-${params.Database}-aurora-postgresql-global-cluster-${build_number}"
+                          echo "${DBGlobalClusterIdentifier} is db global cluster identifer"
+                          DBInstanceIdentifier1="${envapp}-aurora-postgresql-instance-${build_number}-01"
+                          echo "${DBInstanceIdentifier1} is instance identifer"
+                          DBInstanceIdentifier2="${envapp}-aurora-postgresql-instance-${build_number}-02"
+                          echo "${DBInstanceIdentifier2} is instance identifer"
+                          DRDBClusterIdentifier="${params.Environment}-usw2-${params.Database}-aurora-postgresql-cluster-${build_number}"
+                          echo "${DRDBClusterIdentifier} is DR db cluster identifier"
+                          DRDBInstanceIdentifier="${params.Environment}-usw2-${params.Database}-aurora-postgresql-instance-${build_number}-01"
+                          echo "${DRDBInstanceIdentifier} is instance identifer"
+                          DRDBInstanceIdentifier2="${params.Environment}-usw2-${params.Database}-aurora-postgresql-instance-${build_number}-02"
+                          echo "${DRDBInstanceIdentifier} is instance identifer"
+                          enginetype="aurora-postgresql"
+                          echo "${enginetype} is enginetype"
+                          appid="C8B7BC4B-94FB-47C0-896A-654BAD846352"  ////67C80796-C9A6-466B-B824-7578C9082115//
+                          EngineVersion="${EngineVersion}"
+                          Snapshot_ARN="${Snapshot_ARNs}"
+                          
+                      } else {   
+                      
+                         rgn()
+                          build_number="${params.BuildNumber}"
+                          envapp="${params.Environment}-${params.REGION}-${params.Database}"
+                          echo "${envapp} is the Enviroment-Region-APPName"
+                          echo "${build_number} is input buildnumber of the job"
+                          stackname="${envapp}-RDS-CF-Stack-${build_number}"
+                          echo "${stackname} is the STACKNAME"
+                          //dbusername="rdsmstr"
+                          //echo "${dbusername} is dbusername"
+                          dbpassword="Rdsmstr_4378"
+                          //echo "${dbpassword} is dbpassword"
+                          DBClusterIdentifier="${envapp}-aurora-postgresql-cluster-${build_number}"
+                          echo "${DBClusterIdentifier} is db cluster identifier"
+                          DBGlobalClusterIdentifier="${params.Environment}-${params.Database}-aurora-postgresql-global-cluster-${build_number}"
+                          echo "${DBGlobalClusterIdentifier} is db global cluster identifer"
+                          DBInstanceIdentifier1="${envapp}-aurora-postgresql-instance-${build_number}-01"
+                          echo "${DBInstanceIdentifier1} is instance identifer"
+                          DBInstanceIdentifier2="${envapp}-aurora-postgresql-instance-${build_number}-02"
+                          echo "${DBInstanceIdentifier2} is instance identifer"
+                          DRDBClusterIdentifier="${params.Environment}-usw2-${params.Database}-aurora-postgresql-cluster-${build_number}"
+                          echo "${DRDBClusterIdentifier} is DR db cluster identifier"
+                          DRDBInstanceIdentifier="${params.Environment}-usw2-${params.Database}-aurora-postgresql-instance-${build_number}-01"
+                          echo "${DRDBInstanceIdentifier} is instance identifer"
+                          DRDBInstanceIdentifier2="${params.Environment}-usw2-${params.Database}-aurora-postgresql-instance-${build_number}-02"
+                          echo "${DRDBInstanceIdentifier} is instance identifer"
+                          enginetype="aurora-postgresql"
+                          echo "${enginetype} is enginetype"
+                          appid="C8B7BC4B-94FB-47C0-896A-654BAD846352"  //67C80796-C9A6-466B-B824-7578C9082115//
+                          EngineVersion="${EngineVersion}"
+                          Snapshot_ARN="${Snapshot_ARNs}"
+                      
+                      }              
+                   
+                }
+}
+void snapshot_vars() {
+            script {                       
+                      if ( params.Restore_Environment == 'PREPROD' || params.Restore_Environment == 'PROD' ){  
+                          rgn()
+                          build_number="${currentBuild.number}"
+                          envapp="${params.Restore_Environment}-${params.REGION}-${params.Database}"
+                          echo "${envapp} is the Enviroment-Region-APPName"
+                          echo "${build_number} is defaut buildnumber of the job"
+                          stackname="${envapp}-RDS-CF-Stack-${build_number}"
+                          echo "${stackname} is the STACKNAME"
+                          DBClusterIdentifier="${envapp}-aurora-postgresql-cluster-${build_number}"
+                          echo "${DBClusterIdentifier} is db cluster identifier"
+                          DBGlobalClusterIdentifier="${params.Restore_Environment}-${params.Database}-aurora-postgresql-global-cluster-${build_number}"
+                          echo "${DBGlobalClusterIdentifier} is db global cluster identifer"
+                          DBInstanceIdentifier1="${envapp}-aurora-postgresql-instance-${build_number}-01"
+                          echo "${DBInstanceIdentifier1} is instance identifer"
+                          DBInstanceIdentifier2="${envapp}-aurora-postgresql-instance-${build_number}-02"
+                          echo "${DBInstanceIdentifier2} is instance identifer"
+                          DRDBClusterIdentifier="${params.Restore_Environment}-usw2-${params.Database}-aurora-postgresql-cluster-${build_number}"
+                          echo "${DRDBClusterIdentifier} is DR db cluster identifier"
+                          DRDBInstanceIdentifier="${params.Restore_Environment}-usw2-${params.Database}-aurora-postgresql-instance-${build_number}-01"
+                          echo "${DRDBInstanceIdentifier} is instance identifer"
+                          DRDBInstanceIdentifier2="${params.Restore_Environment}-usw2-${params.Database}-aurora-postgresql-instance-${build_number}-02"
+                          echo "${DRDBInstanceIdentifier2} is 2nd instance identifer"
+                          enginetype="aurora-postgresql"
+                          echo "${enginetype} is enginetype"
+                          appid="67C80796-C9A6-466B-B824-7578C9082115"  ////67C80796-C9A6-466B-B824-7578C9082115// //EEA3AA80-35D5-4C84-8403-39761A7215B8//
+			  EngineVersion="${EngineVersion}"
+                          Snapshot_ARN="${Snapshot_ARNs}"
+                          
+                      } 
+                   
+                }
+}
+void restore_env() {
+            script {
+                        if ( params.Restore_Environment == '' ) {
+                              restore_env="${params.Environment}"
+                              echo "${restore_env} restore_env variable value"
+                        } else if (  params.Restore_Environment == 'PREPROD' ) {
+                             restore_env="${params.Restore_Environment}"
+                             echo "${restore_env} restore_env variable value"
+                        } else if ( params.Restore_Environment == 'PROD') {
+			     restore_env="${params.Restore_Environment}"
+                             echo "${restore_env} restore_env variable value"
+			}
+                          
+                  }
+       }

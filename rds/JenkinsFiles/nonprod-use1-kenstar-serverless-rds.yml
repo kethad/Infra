@@ -1,0 +1,297 @@
+#This CFT will deploy RDS DB for Kenstar in AWS lower environment.
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+ Engine:
+   Description: The name of the database engine to be used for this instance.
+   Type: String
+   Default: aurora-mysql
+ GlobalClusterIdentifier:
+   Description: A name for the GlobalClusterIdentifier.
+   Type: String
+ Environment:
+   Type: String
+   Description: Environment Name (DEV/QA/UAT)
+   AllowedValues: ['DEV', 'QA', 'dev', 'qa','UAT','uat']
+ Database:
+   Type: String
+   Default: 'KENSTAR'
+   Description: Database Name  
+ AppID:
+   Type: String
+   Default: '403A115B-3E7F-4163-BE88-D67982C6B566'
+   Description: AppID
+ BU:
+   Type: String
+   Default: 'DJI'
+   Description: BU Name
+ SupportGroup:
+   Type: String
+   Default: 'IM-SPDJI-Index infrastructure'
+   Description: SupportGroup Name
+ DBUsername:
+   NoEcho: 'true'
+   Description: Username for MySQL database access
+   Type: String
+   Default: 'rdsmstr'
+   MinLength: '1'
+   MaxLength: '16'
+   AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+   ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
+ DBPassword:
+   NoEcho: 'true'
+   Description: Password MySQL database access
+   Type: String
+   MinLength: '8'
+   MaxLength: '41'
+   AllowedPattern: '^[a-zA-Z]+[0-9a-zA-Z_]*$'
+   ConstraintDescription: Must start with a letter. Only numbers, letters, and _ accepted. max length 16 characters
+ AllowMajorVersionUpgrade:
+   Description: If you update the EngineVersion property to a version that is different from the DB instances current major version, set this property to true.
+   Type: String
+   AllowedValues: [true, false]
+   ConstraintDescription: "Value must be boolean value."
+   Default: false
+ AutoMinorVersionUpgrade:
+   Description: Indicates that minor engine upgrades are applied automatically to the DB instance during the maintenance window. The default value is true.
+   Type: String
+   AllowedValues: [true, false]
+   Default: true
+   ConstraintDescription: "Value must be boolean value."
+ BackupRetentionPeriod:
+  Description: The number of days during which automatic DB snapshots are retained.
+  Type: String
+  AllowedPattern: "^[0-9]{1,3}$"
+  ConstraintDescription: "Value must be a valid number between 0-999."
+  Default: 3
+ DBInstanceClass:
+   Description: The name of the compute and memory capacity classes of the DB instance.
+   Type: String
+   Default: db.serverless
+ MultiAZ:
+   Description: Specifies if the database instance is a multiple Availability Zone deployment.
+   Type: String
+   AllowedValues: [true, false]
+   Default: false
+   ConstraintDescription: "Value must be boolean value." 
+ DeletionProtection:
+   Description: A value that indicates whether the DB cluster has deletion protection enabled. The database can be deleted when deletion protection is enabled. By default, deletion protection is disabled.
+   Type: String
+   Default: true
+ EngineVersion:
+   Description: The version number of the database engine to use.
+   Type: String
+   Default: 8.0.mysql_aurora.3.02.0
+ DBCACertificateIdentifier:
+   Description: The name of the CA Certificate to use with the DB instance.
+   Type: String
+   Default: rds-ca-rsa2048-g1
+   AllowedValues: [rds-ca-rsa2048-g1,rds-ca-rsa4096-g1,rds-ca-ecc384-g1,rds-ca-2019]
+
+ DBInstanceIdentifier:
+   Description: A name for the DB instance.
+   Type: String
+ DBClusterIdentifier:
+   Description: A name for the DB instance.
+   Type: String
+ StorageType:
+   Type: String
+   Default: gp2
+   AllowedValues: [gp2, io1]
+ MaxAllocatedStorage:
+   Type: String
+   Default: 1000
+   Description: The upper limit to which Amazon RDS can automatically scale the storage of the DB instance.  
+Mappings:
+ DBSubnetGroup:
+   DEV:
+     DBSubnetGroupName: dev-rds-private-subnet-group-01
+   QA:
+     DBSubnetGroupName: qa-rds-private-subnet-group-01
+   UAT:
+     DBSubnetGroupName: uat-db-subnets
+ MaintenanceWindow:
+   DEV:
+     PreferredMaintenanceWindow: tue:04:00-tue:08:00
+   QA:
+     PreferredMaintenanceWindow: wed:04:00-wed:08:00
+   UAT:
+     PreferredMaintenanceWindow: thu:04:00-thu:08:00
+
+ VPCSecurityGroups:
+   DEV:
+     SGID: [sg-03dec67f]
+   QA:
+     SGID: [sg-a5da35d4]
+   UAT:
+     SGID: [sg-8b5553fd]  
+ KeyNames:
+   DEV:
+     Name: 'alias/rds-nonprod-kms-key'
+   QA:
+     Name: 'alias/QA-RDS'
+   UAT:
+     Name: 'alias/UAT-RDS'
+ DBParameterGroupName:
+   DEV:
+     Name: dev-kenstar-param-auroramysql8-serverless
+   QA:
+     Name: qa-kenstar-param-auroramysql8-serverless
+   UAT:
+     Name: uat-kenstar-param-auroramysql8-serverless
+ DBClusterParameterGroupName:
+   DEV:
+     Name: dev-kenstar-cluster-param-auroramysql8-serverless
+   QA:
+     Name: qa-kenstar-cluster-param-auroramysql8-serverless
+   UAT:
+     Name: uat-kenstar-cluster-param-auroramysql8-serverless
+ OptionGroupName:
+   DEV:
+     Name: default:aurora-mysql-8-0
+   QA:
+     Name: default:aurora-mysql-8-0
+   UAT:
+     Name: default:aurora-mysql-8-0
+ DBAllocatedStorage:
+   DEV:
+     Storage: 300
+   QA:
+     Storage: 300
+   UAT:
+     Storage: 500
+ DBName:
+   DEV:
+     Name: devkenstar
+   QA:
+     Name: qakenstar
+   UAT:
+     Name: uatkenstar
+Resources:
+ GlobalCluster:
+   Type: 'AWS::RDS::GlobalCluster'
+   Properties:
+     GlobalClusterIdentifier: !Ref GlobalClusterIdentifier
+     SourceDBClusterIdentifier: !Ref DBCluster
+ DBCluster:
+   Type: AWS::RDS::DBCluster
+   Properties:
+     DBClusterIdentifier: !Ref DBClusterIdentifier
+     DBClusterParameterGroupName: !FindInMap
+       - DBClusterParameterGroupName
+       - !Ref Environment
+       - Name
+     DatabaseName: !FindInMap
+       - DBName
+       - !Ref Environment
+       - Name
+     DBSubnetGroupName: !FindInMap
+       - DBSubnetGroup
+       - !Ref Environment
+       - DBSubnetGroupName
+     DeletionProtection: !Ref DeletionProtection
+     EnableCloudwatchLogsExports:
+        - audit
+        - error
+        - general
+        - slowquery
+     BackupRetentionPeriod: !Ref BackupRetentionPeriod
+     PreferredBackupWindow: 03:00-04:00
+     Engine: !Ref Engine
+     EngineMode: provisioned
+     EngineVersion: !Ref EngineVersion
+     Port: 3306
+     CopyTagsToSnapshot: Yes
+     PreferredMaintenanceWindow: !FindInMap
+       - MaintenanceWindow
+       - !Ref Environment
+       - PreferredMaintenanceWindow
+     ServerlessV2ScalingConfiguration:
+         MinCapacity: 2
+         MaxCapacity: 16
+     StorageEncrypted: Yes
+     KmsKeyId: !FindInMap
+       - KeyNames
+       - !Ref Environment
+       - Name
+     MasterUsername: !Ref DBUsername
+     MasterUserPassword: !Ref DBPassword
+     Tags:
+     - Key: Name
+       Value: !Sub ${Environment}-${Database}-${DBClusterIdentifier}
+     - Key: Owner
+       Value: !Ref Database
+     - Key: AppID
+       Value: !Ref AppID
+     - Key: BU
+       Value: !Ref BU
+     - Key: Environment
+       Value: !Ref Environment
+     - Key: SupportGroup
+       Value: !Ref SupportGroup
+     - Key: UsedFor
+       Value: RDS  
+     VpcSecurityGroupIds: !FindInMap
+       - VPCSecurityGroups
+       - !Ref Environment
+       - SGID
+ RDSDBInstance:
+    Type: 'AWS::RDS::DBInstance'
+    Properties:
+       DBClusterIdentifier: !Ref DBCluster
+       AllowMajorVersionUpgrade: !Ref AllowMajorVersionUpgrade
+       AutoMinorVersionUpgrade: !Ref AutoMinorVersionUpgrade
+       DBInstanceClass: !Ref DBInstanceClass
+       CACertificateIdentifier: !Ref DBCACertificateIdentifier
+       Engine: !Ref Engine
+       EngineVersion: !Ref EngineVersion
+       DBSubnetGroupName: !FindInMap
+         - DBSubnetGroup
+         - !Ref Environment
+         - DBSubnetGroupName
+       #PreferredMaintenanceWindow: !Ref PreferredMaintenanceWindow
+       #PreferredBackupWindow: !Ref PreferredBackupWindow
+       MultiAZ: !Ref MultiAZ
+       CopyTagsToSnapshot: Yes
+       DeleteAutomatedBackups: Yes
+       PubliclyAccessible: No
+       DBInstanceIdentifier: !Ref DBInstanceIdentifier
+       DBParameterGroupName: !FindInMap
+         - DBParameterGroupName
+         - !Ref Environment
+         - Name
+       OptionGroupName: !FindInMap
+         - OptionGroupName
+         - !Ref Environment
+         - Name
+       Tags:
+       - Key: Name
+         Value: !Sub ${Environment}-${Database}-${DBInstanceIdentifier}
+       - Key: Owner
+         Value: !Ref Database
+       - Key: AppID
+         Value: !Ref AppID
+       - Key: BU
+         Value: !Ref BU
+       - Key: Environment
+         Value: !Ref Environment
+       - Key: SupportGroup
+         Value: !Ref SupportGroup
+       - Key: UsedFor
+         Value: RDS
+         
+Outputs:
+  GlobalClusterName:
+    Description:  'InstanceName of the newly created RDS Instance'
+    Value: !Ref 'GlobalClusterIdentifier'
+  ClusterName:
+    Description:  'InstanceName of the newly created RDS Instance'
+    Value: !Ref 'DBClusterIdentifier'
+  ClusterEndpoint:
+    Description: 'Aurora Cluster/Writer Endpoint'
+    Value: !GetAtt 'DBCluster.Endpoint.Address'
+  InstanceName:
+    Description:  'InstanceName of the newly created RDS Instance'
+    Value: !Ref 'DBInstanceIdentifier'
+  ReaderEndpoint:
+    Description: 'Aurora Reader Endpoint'
+    Value: !GetAtt 'DBCluster.ReadEndpoint.Address'

@@ -1,0 +1,303 @@
+#This CF template will create RDS database for CIP Application in AWS lower environment. 
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  Environment:
+    Type: String
+    Description: Environment Name (PREPROD/PROD/DR)
+    AllowedValues: ['PROD', 'DR', 'prod', 'dr','PREPROD','preprod']
+  Database:
+    Type: String
+    Default: 'CIP'  ##was CIP
+  BuildNumber:
+    Type: String
+  AppID:
+    Type: String
+    Default: '67C80796-C9A6-466B-B824-7578C9082115'   ##EEA3AA80-35D5-4C84-8403-39761A7215B8 ##67C80796-C9A6-466B-B824-7578C9082115
+    Description: AppID
+  BU:
+    Type: String
+    Default: 'DJI'
+    Description: BU Name
+  SupportGroup:
+    Type: String
+    Default: 'IM-SPDJI-Index infrastructure'
+    Description: SupportGroup Name
+  DBUsername:
+    NoEcho: 'true'
+    Description: CIP RDS DB Master username
+    Type: String
+    Default: 'rdsmstr'
+    MinLength: '3'
+    MaxLength: '16'
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: must begin with a letter and contain only alphanumeric characters
+  DBPassword:
+    NoEcho: 'true'
+    Description: Password of RDS database access
+    Type: String
+    MinLength: '8'
+    MaxLength: '41'
+    AllowedPattern: '^[a-zA-Z]+[0-9a-zA-Z_]*$'
+    ConstraintDescription: Must start with a letter. Only numbers, letters, and _ accepted. max length 16 characters
+  AllowMajorVersionUpgrade:
+    Description: If you update the EngineVersion property to a version that is different from the DB instances current major version, set this property to true
+    Type: String
+    AllowedValues: [true, false]
+    ConstraintDescription: "Value must be boolean value."
+    Default: false
+  AutoMinorVersionUpgrade:  
+    Description: Indicates that minor engine upgrades are applied automatically to the DB instance during the maintenance window. The default value is true.
+    Type: String
+    AllowedValues: [true, false]
+    Default: true
+    ConstraintDescription: "Value must be boolean value."  
+  BackupRetentionPeriod:
+    Description: The number of days during which automatic DB snapshots are retained.
+    Type: String
+    AllowedPattern: "^[0-9]{1,3}$"
+    ConstraintDescription: "Value must be a valid number between 0-999."
+    Default: 35  ##was 3 previously
+  DBInstanceClass:
+    Description: The name of the compute and memory capacity classes of the DB instance.
+    Type: String
+    Default: db.r5.2xlarge
+    AllowedValues: [db.r5.large,db.r5.xlarge,db.r5.2xlarge] 
+  Engine:
+    Description: The name of the database engine to be used for this instance.
+    Type: String
+    Default: aurora-postgresql
+    AllowedValues: [mysql, mariadb, postgres, oracle-ee,aurora-postgresql]
+    ConstraintDescription: "Please specify either a mysql, mariadb, or postgres engine for the RDS instance."
+  DeletionProtection:
+    Description: A value that indicates whether the DB cluster has deletion protection enabled. The database can be deleted when deletion protection is enabled. By default, deletion protection is disabled.
+    Type: String
+    Default: yes
+  EngineVersion:
+    Description: The version number of the database engine to use.
+    Type: String
+    Default: 11.15
+  PreferredMaintenanceWindow:
+    Description: Maintenance Window.
+    Type: String
+    #Default: fri:03:00-fri:04:00
+    Default: sat:04:01-sat:08:00
+  
+  PreferredBackupWindow:
+    Description: Backup Window.
+    Type: String
+    #Default: fri:03:00-fri:04:00
+    Default: 03:01-04:00 
+    
+  DBGlobalClusterIdentifier:
+    Description: A name for the Global DB cluster.
+    Type: String
+  DBClusterIdentifier:
+    Description: A name for the DB cluster.
+    Type: String
+  DBInstanceIdentifier1:
+    Description: A name for the DB instance.
+    Type: String  
+  DBInstanceIdentifier2:
+    Description: A name for the DB instance.
+    Type: String
+  PerformanceInsightsRetentionPeriod:
+    Type: String
+    Default: 7
+    AllowedValues: [7,35]
+
+
+Mappings:
+  DBSubnetGroup:
+    PREPROD:
+      DBSubnetGroupName: preprod-use1-priv-subnet-group
+    PROD:
+      DBSubnetGroupName: prod-use1-priv-rds-subnet-group-01
+    DR:
+      DBSubnetGroupName: dr-usw2-priv-rds-subnet-group-01
+  VPCSecurityGroups:
+    PREPROD:
+      SGID: [sg-0e5a7137dd4c093e1]
+    PROD:
+      SGID: [sg-9e7894ef]
+    DR:
+      SGID: [sg-0371be49396b87216]
+  KeyNames:
+    PREPROD:
+      Name: 'alias/rds-prod-kms-key'
+    PROD:
+      Name: 'alias/rds-prod-kms-key' 
+    DR:
+      Name: 'alias/rds-dr-oregon-key1' 
+  DBParameterGroupName:
+    PREPROD:
+      #Name: prod-cip-param-aurapostgres
+      Name: preprod-cip-param-aurapostgres
+    PROD: 
+      Name: prod-cip-param-aurapostgres
+  DBClusterParameterGroup:
+    PREPROD:
+      #Name: prod-cip-cluster-param-aurapostgres
+      Name: preprod-cip-cluster-param-aurapostgres
+    PROD:
+      Name: prod-cip-cluster-param-aurapostgres
+  DBName:
+    PREPROD:
+      Name: cipspt
+    PROD:
+      Name: cipp
+
+Resources:
+  CIPGlobalCluster:
+    Type: AWS::RDS::GlobalCluster
+    Properties: 
+      DeletionProtection: !Ref DeletionProtection
+      Engine: !Ref Engine
+      EngineVersion: !Ref EngineVersion
+      GlobalClusterIdentifier: !Ref DBGlobalClusterIdentifier
+      StorageEncrypted: Yes
+  CIPRDSCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      GlobalClusterIdentifier: !Ref CIPGlobalCluster
+      DBClusterIdentifier: !Ref DBClusterIdentifier
+      Engine: !Ref Engine
+      EngineVersion: !Ref EngineVersion
+      Port: 5432
+      DBSubnetGroupName: !FindInMap
+        - DBSubnetGroup
+        - !Ref Environment
+        - DBSubnetGroupName
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      BackupRetentionPeriod: !Ref BackupRetentionPeriod
+      EnableIAMDatabaseAuthentication: Yes
+      DBClusterParameterGroupName: !FindInMap
+        - DBClusterParameterGroup
+        - !Ref Environment
+        - Name
+      DeletionProtection: !Ref DeletionProtection
+      VpcSecurityGroupIds: !FindInMap
+        - VPCSecurityGroups
+        - !Ref Environment
+        - SGID
+      StorageEncrypted: Yes
+      KmsKeyId: !FindInMap
+        - KeyNames
+        - !Ref Environment
+        - Name
+      EnableCloudwatchLogsExports:
+        - 'postgresql'
+      DatabaseName: !FindInMap
+        - DBName
+        - !Ref Environment
+        - Name
+      PreferredMaintenanceWindow: !Ref PreferredMaintenanceWindow
+      PreferredBackupWindow: !Ref PreferredBackupWindow
+      Tags:
+      - Key: Name
+        Value: !Sub ${Environment}-${DBClusterIdentifier}
+      - Key: Owner
+        Value: !Ref Database
+      - Key: AppID
+        Value: !Ref AppID
+      - Key: BU
+        Value: !Ref BU
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: SupportGroup
+        Value: !Ref SupportGroup
+      - Key: UsedFor
+        Value: Aurora Cluster
+      - Key: Build_Number
+        Value: !Ref BuildNumber
+        
+  CIPRDSInstance1: 
+    Type: 'AWS::RDS::DBInstance'
+    Properties: 
+      DBClusterIdentifier: !Ref CIPRDSCluster
+      DBInstanceClass: !Ref DBInstanceClass
+      DBParameterGroupName: !FindInMap
+        - DBParameterGroupName
+        - !Ref Environment
+        - Name
+      #PreferredMaintenanceWindow: !Ref PreferredMaintenanceWindow
+      #PreferredBackupWindow: !Ref PreferredBackupWindow
+      CopyTagsToSnapshot: Yes
+      #DeleteAutomatedBackups: Yes
+      PubliclyAccessible: No
+      DBInstanceIdentifier: !Ref DBInstanceIdentifier1
+      Engine: !Ref Engine
+      EngineVersion: !Ref EngineVersion
+      PubliclyAccessible: No
+      EnablePerformanceInsights: Yes
+      PerformanceInsightsKMSKeyId: arn:aws:kms:us-east-1:897860998156:key/8c63c41b-8265-47cb-ad5d-7fbd9116a2f4
+      PerformanceInsightsRetentionPeriod: !Ref PerformanceInsightsRetentionPeriod
+      
+      Tags:
+      - Key: Name
+        Value: !Sub ${Environment}-${Database}-${DBInstanceIdentifier1}-01
+      - Key: Owner
+        Value: !Ref Database
+      - Key: AppID
+        Value: !Ref AppID
+      - Key: BU
+        Value: !Ref BU
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: SupportGroup
+        Value: !Ref SupportGroup
+      - Key: UsedFor
+        Value: RDS
+      - Key: AutomatedSnapshot
+        Value: Yes 
+
+  CIPRDSInstance2: 
+    Type: 'AWS::RDS::DBInstance'
+    Properties: 
+      DBClusterIdentifier: !Ref CIPRDSCluster
+      DBInstanceClass: !Ref DBInstanceClass
+      DBParameterGroupName: !FindInMap
+        - DBParameterGroupName
+        - !Ref Environment
+        - Name
+      #PreferredMaintenanceWindow: !Ref PreferredMaintenanceWindow
+      #PreferredBackupWindow: !Ref PreferredBackupWindow
+      CopyTagsToSnapshot: Yes
+      #DeleteAutomatedBackups: Yes
+      PubliclyAccessible: No
+      DBInstanceIdentifier: !Ref DBInstanceIdentifier2
+      Engine: !Ref Engine
+      EngineVersion: !Ref EngineVersion
+      PubliclyAccessible: No
+      EnablePerformanceInsights: Yes
+      PerformanceInsightsKMSKeyId: arn:aws:kms:us-east-1:897860998156:key/8c63c41b-8265-47cb-ad5d-7fbd9116a2f4
+      PerformanceInsightsRetentionPeriod: !Ref PerformanceInsightsRetentionPeriod
+      
+      Tags:
+      - Key: Name
+        Value: !Sub ${Environment}-${Database}-${DBInstanceIdentifier2}-02
+      - Key: Owner
+        Value: !Ref Database
+      - Key: AppID
+        Value: !Ref AppID
+      - Key: BU
+        Value: !Ref BU
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: SupportGroup
+        Value: !Ref SupportGroup
+      - Key: UsedFor
+        Value: RDS
+      - Key: AutomatedSnapshot
+        Value: Yes      
+
+Outputs:
+  GlobalClusterName:
+    Description:  'InstanceName of the newly created RDS Instance'
+    Value: !Ref 'CIPGlobalCluster'
+  ClusterEndpoint:
+    Description: 'Aurora Cluster/Writer Endpoint'
+    Value: !GetAtt 'CIPRDSCluster.Endpoint.Address'
+  ReaderEndpoint:
+    Description: 'Aurora Reader Endpoint'
+    Value: !GetAtt 'CIPRDSCluster.ReadEndpoint.Address'

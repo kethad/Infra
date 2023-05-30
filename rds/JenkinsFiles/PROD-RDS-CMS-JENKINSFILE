@@ -1,0 +1,346 @@
+pipeline {
+    
+    agent { label ' USE1-SLAVE-01 || USW2-SLAVE-01 '}
+    //agent { label "${params.Slave}" }
+    stages {
+    
+    
+        stage('RDS-Parameters-Echo') {
+            
+             steps {
+                
+                echo "  ${params.Environment} ${params.REGION} ${params.Database} ${params.STAGES} ${params.InputSnapshotARN} ${params.BuildNumber} ${params.Slave} "
+                 
+             }
+         }
+         
+        stage('RDSCreation') {
+            when {
+                expression { params.STAGES == 'RDSCreation'  }
+                expression { params.Environment == 'PROD' || params.Environment == 'DR'}
+            }
+            
+            steps {
+               echo "${params.STAGES} is the Selected Stage for ${params.Environment}"
+               rdscft()
+               stackvars()
+               audit()
+               echo "${BUILD_USER} is Build_User"
+               echo "${BUILD_USER_MAIL_ID} is Build_User_Mail_ID"
+               //echo "Snapshot Arn is ${snapshot_arn}"
+               
+               //RDSMaster Random Password generation
+               echo "executing randompwd function"
+               sh " cd ${JENKINS_HOME}/workspace/${Job_Name}/rds/ ;chmod +x random_passwd.py ;./random_passwd.py ${envapp} ${build_number}"
+               randompwd()
+                
+               sh "aws cloudformation create-stack --stack-name ${stackname} --template-body ${TemplateName} --parameters ParameterKey=Environment,ParameterValue=${params.Environment} ParameterKey=Database,ParameterValue=${params.Database}  ParameterKey=DBInstanceIdentifier,ParameterValue=${dbidentifier}  ParameterKey=DBPassword,ParameterValue=${randompwd} --capabilities CAPABILITY_NAMED_IAM --region '${region}'  --tags Key=Owner,Value=${params.Database} Key=AppID,Value=${appid} Key=BU,Value=DJI  | tr -d {} | awk NF | awk '{print \$2}' > /var/tmp/${envapp}-${build_number}  " 
+               STID()
+               echo "${STID} is StackID outside STID Function"
+               sh " aws cloudformation wait stack-create-complete --region '${region}' --stack-name ${STID}  "
+               sh " aws cloudformation describe-stack-events --stack-name  ${stackname} --region '${region}' "
+               
+               //DynamoDB-Table-Update
+               
+               echo "Going to execute the Wrapper shell script to update the DynamoDB table"
+               //sh " cd ${JENKINS_HOME}/workspace/${Job_Name}/rds ; chmod +x oracle_nonprod_cf.py oracle_nonprod_wrapper.sh "
+               sh " sudo chmod +x ${JENKINS_HOME}/workspace/${Job_Name}/rds/mysql_postgresql_nonprod_wrapper.sh "
+               sh " ${JENKINS_HOME}/workspace/${Job_Name}/rds/mysql_postgresql_nonprod_wrapper.sh ${stackname} ${region} ${envapp} ${build_number} ${BUILD_USER_MAIL_ID} "
+               rdsstackcrvars()
+                }
+            }
+            
+            
+        stage('ReplicaCreation') {
+            when {
+                expression { params.STAGES == 'ReplicaCreation'  }
+                expression { params.Environment == 'DR' || params.Environment == 'PROD' }
+            }
+            
+            steps {
+               echo "${params.STAGES} is the Selected Stage for ${params.Environment}"
+               rdscft()
+               stackvars()
+               audit()
+               echo "${BUILD_USER} is Build_User"
+               echo "${BUILD_USER_MAIL_ID} is Build_User_Mail_ID"
+               //echo "Snapshot Arn is ${snapshot_arn}"   
+               
+               //Oracle Replica creation in Oregon
+               echo "Executing Oracle Replica creation script"
+               sh " cd ${JENKINS_HOME}/workspace/${Job_Name}/rds/;chmod +x nonprod_cms_usw2_oracle_replica.sh  "
+               sh " ${JENKINS_HOME}/workspace/${Job_Name}/rds/nonprod_cms_usw2_oracle_replica.sh ${dbidentifier} ${replicadbidentifier} ${region} ${params.Environment} ${params.Database} "
+               //DynamoDB-Table-Update
+               echo "Going to execute the oracle_nonprod_wrapper.sh wrapper shell script to update the DynamoDB table"
+               sh " cd ${JENKINS_HOME}/workspace/${Job_Name}/rds ; chmod +x oracle_nonprod_cf.py oracle_nonprod_wrapper.sh "
+               sh " ${JENKINS_HOME}/workspace/${Job_Name}/rds/oracle_nonprod_wrapper.sh ${stackname} ${region} ${envapp} ${build_number} ${BUILD_USER_MAIL_ID} ${replicadbidentifier} "
+               rdsstackcrvars()
+                }
+            }
+            
+            
+        stage('RDSCreationFromSnapshot') {
+            when {
+                expression { params.STAGES == 'RDSCreationFromSnapshot'  }
+                expression { params.Environment == 'PROD' || params.Environment == 'DR' }
+            }
+            
+            steps {
+               echo "${params.STAGES} is the Selected Stage for ${params.Environment}"
+               rdscft()
+               stackvars()
+               audit()
+               
+               echo "Snapshot Arn is ${snapshot_arn}"
+               
+               //RDSMaster Random Password generation
+               echo "executing randompwd function"
+               sh " cd ${JENKINS_HOME}/workspace/${Job_Name}/rds/ ;chmod +x random_passwd.py ;./random_passwd.py ${envapp} ${build_number}"
+               randompwd()
+               
+               sh "aws cloudformation create-stack --stack-name ${stackname} --template-body ${TemplateName} --parameters ParameterKey=Environment,ParameterValue=${params.Environment} ParameterKey=Database,ParameterValue=${params.Database}  ParameterKey=DBInstanceIdentifier,ParameterValue=${dbidentifier} ParameterKey=DBSnapshotIdentifier,ParameterValue=${snapshot_arn} --capabilities CAPABILITY_NAMED_IAM --region '${region}' --tags Key=Owner,Value=${params.Database} Key=AppID,Value=${appid} Key=BU,Value=DJI  | tr -d {} | awk NF | awk '{print \$2}' > /var/tmp/${envapp}-${build_number} " 
+               STID()
+               echo "${STID} is StackID outside STID Function"
+               sh " aws cloudformation wait stack-create-complete --region '${region}' --stack-name ${STID}  "
+               sh " aws cloudformation describe-stack-events --stack-name  ${stackname} --region '${region}' "
+               
+               //DynamoDB-Table-Update
+               
+               echo "Going to execute the Wrapper shell script to update the DynamoDB table"
+               sh " cd ${JENKINS_HOME}/workspace/${Job_Name}/rds ; chmod +x oracle_nonprod_cf.py oracle_nonprod_wrapper.sh "
+               sh " ${JENKINS_HOME}/workspace/${Job_Name}/rds/mysql_postgresql_nonprod_wrapper.sh ${stackname} ${region} ${envapp} ${build_number} ${BUILD_USER_MAIL_ID} "
+               rdsstackcrvars()
+                }
+            }
+        
+        stage('RDS-DNS-Update') {
+            when {
+                expression { params.STAGES == 'RDSDNSUpdate'  }
+                //expression { params.Environment == 'PROD' || params.Environment == 'DR' }
+            }
+            
+            steps {
+               echo "${params.STAGES} is the Selected Stage for ${params.Environment}"
+               rdscft()
+               stackvars()
+               
+               sh "cd ${JENKINS_HOME}/workspace/${Job_Name}/rds/ ; sudo chmod +x RetrieveRDSDNS.py RetrieveBuildInfo.py UpdateRDSDNS.py"
+               sh "ansible-playbook -i ${JENKINS_HOME}/workspace/${Job_Name}/rds/inventory ${JENKINS_HOME}/workspace/${Job_Name}/rds/oracle_ee_prod_rds_dns.yml -e envapp=${envapp} -e build_number=${build_number} -e enginetype=${enginetype} -e env=${params.Environment}"
+               rdsdnsupdate()
+               
+                }
+            }
+            
+        stage('RDSDeletion') {
+            when {
+              expression { params.STAGES == 'RDSDeletion' }
+              //expression { params.Environment == 'PROD' }
+            }
+            steps {
+                echo "${params.STAGES} is the Selected Stage for ${params.Environment}"
+                rdscft()
+                stackvars()
+                audit()
+                
+                //sh "cd ${JENKINS_HOME}/workspace/${Job_Name}/rds ; chmod +x del_stack_id.sh"
+                //sh " ${JENKINS_HOME}/workspace/${Job_Name}/rds/del_stack_id.sh ${stackname} ${envapp} ${build_number} "
+                //STID()
+                
+                //rdsstackvars gathering
+                echo "Going to execute the oracle_nonprod_wrapper.sh wrapper shell script to get the rdsstackvars"
+                sh " cd ${JENKINS_HOME}/workspace/${Job_Name}/rds ; chmod +x oracle_nonprod_cf.py oracle_nonprod_wrapper.sh "
+                sh " ${JENKINS_HOME}/workspace/${Job_Name}/rds/oracle_nonprod_wrapper.sh ${stackname} ${region} ${envapp} ${build_number} ${BUILD_USER_MAIL_ID} ${replicadbidentifier} ${params.STAGES} "
+                rdsstackcrvars()
+                
+                // RDSDeletion
+                echo "Decommission of Oracle-ee RDS along with Read Replica"
+                sh " cd ${JENKINS_HOME}/workspace/${Job_Name}/rds ; chmod +x oracle-ee-rds-cms-decommission.sh "
+                sh " ${JENKINS_HOME}/workspace/${Job_Name}/rds/oracle-ee-rds-cms-decommission.sh  ${dbidentifier} ${region} "
+                
+                
+                }
+            }
+         
+        }
+           
+      post {
+        failure {
+        
+                 mail to: 'IDSSupport@spglobal.com,IndexInfraMBX@spglobal.com,IndexInfraNotifications@spglobal.com',
+                 //mail to: 'd.kethavath@spglobal.com,sruthi.tannedi@spglobal.com',
+                 subject: "SPDJI RDSStack: New ${params.Environment} RDS Deployment Failed for ${params.Database} APP Build Number ${build_number}",
+                 body: "New RDS Deployment Failed for ${params.Environment} Environment ${params.Database} APP, for more details click on the url ${env.BUILD_URL}console"
+                
+        }
+        
+        success {
+          
+           script {
+             if ( params.STAGES == 'RDSCreation' ) {
+                
+                    mail to: 'IDSSupport@spglobal.com,IndexInfraMBX@spglobal.com,IndexInfraNotifications@spglobal.com',
+                    //mail to: 'd.kethavath@spglobal.com,sruthi.tannedi@spglobal.com',
+                    subject: "SPDJI RDSStack: New ${params.Environment} RDS Deployment Completed for ${params.Database} APP with BuildNumber ${build_number}",
+                    body: "${rdsstackcrvars}"
+                 
+                    mail to: 'IndexInfraMBX@spglobal.com',
+                    subject: "SPDJI RDSStack RDSMaster Password of: ${params.Environment} Environment ${params.Database} APP with BuildNumber ${build_number} ",
+                    body: "${randompwd} is random password for ${params.Environment} ${params.Database} APP with BuildNumber ${build_number}"
+           
+               } else if (  params.STAGES == 'RDSDeletion' ) {
+              
+                     mail to: 'IDSSupport@spglobal.com,IndexInfraMBX@spglobal.com,IndexInfraNotifications@spglobal.com',
+                     //mail to: 'd.kethavath@spglobal.com,IndexInfraMBX@spglobal.com,sruthi.tannedi@spglobal.com',
+                     subject: "SPDJI RDSStack: New ${params.Environment} RDS Decommission is Completed for ${params.Database} APP with BuildNumber ${build_number} ",
+                     body: "${rdsstackcrvars}" 
+               
+               } else if (  params.STAGES == 'RDSDNSUpdate' ) {
+              
+                     mail to: 'IDSSupport@spglobal.com,IndexInfraMBX@spglobal.com,IndexInfraNotifications@spglobal.com',
+                     //mail to: 'd.kethavath@spglobal.com,sruthi.tannedi@spglobal.com',
+                     subject: "SPDJI RDSStack: New ${params.Environment} RDSDNSUpdate Completed for ${params.Database} APP with BuildNumber ${build_number} ",
+                     body: "${rdsdnsupdate}" 
+               
+               } else if (  params.STAGES == 'RDSCreationFromSnapshot' ) {
+              
+                     mail to: 'IDSSupport@spglobal.com,IndexInfraMBX@spglobal.com,IndexInfraNotifications@spglobal.com',
+                     //mail to: 'd.kethavath@spglobal.com,sruthi.tannedi@spglobal.com',
+                     subject: "SPDJI RDSStack: New ${params.Environment} RDSCreationFromSnapshot Completed for ${params.Database} APP with BuildNumber ${build_number} ",
+                     body: "${rdsstackcrvars}" 
+               
+                } else {
+                     mail to: 'IDSSupport@spglobal.com,IndexInfraMBX@spglobal.com,IndexInfraNotifications@spglobal.com',
+                     //mail to: 'd.kethavath@spglobal.com,sruthi.tannedi@spglobal.com',
+                     subject: "SPDJI RDSStack: Please provide valid Parameters for: ${params.Environment} Environment ${params.Database} APP",
+                     body: "SPDJI RDSStack: Please provide valid Parameters for: ${params.Environment} Environment ${params.Database} APP"
+               
+               }
+           }
+        }
+    }      
+}
+          
+ 
+        void rdscft() {
+            script {
+                        if ( params.REGION == 'USE1' && params.STAGES == 'RDSCreation') {
+                             TemplateName = "file://rds/JenkinsFiles/prod-cms-rds.yml"
+                             echo "${TemplateName} is the cloudformation template name as per the APP name"
+                        } else if ( params.REGION == 'USW2' && params.STAGES == 'RDSCreation') {
+                             TemplateName = "file://rds/JenkinsFiles/prod-cms-rds.yml"
+                             echo "${TemplateName} is the cloudformation template name as per the APP name"     
+                        } else if ( params.REGION == 'USE1' && params.STAGES == 'RDSCreationFromSnapshot') {
+                             TemplateName = "file://rds/JenkinsFiles/prod-cms-rds-snapshot.yml"
+                             echo "${TemplateName} is the cloudformation template name as per the APP name"
+                        }
+                           else {
+                           echo "YOU MUST SELECT THE ONE OF THE APP NAME from the Database Variable"
+                        }
+                       }
+                      }
+                      
+        
+        void rgn() {
+            script {
+                        if ( params.REGION == 'USE1' ) {
+                              RGN="VA"
+                              region="us-east-1"
+                              echo "${RGN} is Short form of North Virginia"
+                              
+                        }  else if (  params.REGION == 'USW2' ) {
+                             RGN="OR"
+                             region="us-west-2"
+                             echo "${RGN} is Short form of Oregon"
+                        }
+                          
+                  }
+       }
+        
+        
+        void randompwd() { 
+            
+          randompwd = readFile("${JENKINS_HOME}/workspace/${Job_Name}/rds/random_pass-${envapp}-${build_number}")
+          //echo "${randompwd} is random password"
+        }
+        
+        void STID() { 
+            
+          STID = readFile("/var/tmp/${envapp}-${build_number}")
+          echo "${STID} is StackID inside STID Function"
+        }
+        
+        void rdsstackcrvars() { 
+            
+          rdsstackcrvars = readFile("${JENKINS_HOME}/workspace/${Job_Name}/rds/${envapp}.cfvars.txt")
+          echo "${rdsstackcrvars} are rdsvars inside rdsstackcrvars Function"
+        }
+        
+       void rdsdnsupdate() { 
+            
+          rdsdnsupdate = readFile("${JENKINS_HOME}/workspace/${Job_Name}/rds/${envapp}.rdsdnsupdate.txt")
+          echo "${rdsdnsupdate} are rdsdnsupdate fileoutput inside rdsdnsupdate Function"
+        }
+
+
+        
+        void audit() {
+             script {
+                  wrap([$class: 'BuildUser']) {
+                      BUILD_USER="${BUILD_USER}"
+                      //echo "${BUILD_USER} is build user name"
+                      BUILD_USER_MAIL_ID="${BUILD_USER_EMAIL}"
+                      //echo "${BUILD_USER_EMAIL} is build user mail id"
+                  }  
+       
+             }
+        }
+        
+        
+        void stackvars() {
+            script {
+                        
+                      if ( params.BuildNumber == '' ){  
+                          rgn()
+                          build_number="${currentBuild.number}"
+                          envapp="${params.Environment}-${params.REGION}-${params.Database}"
+                          echo "${envapp} is the Enviroment-Region-APPName"
+                          echo "${build_number} is defaut buildnumber of the job"
+                          stackname="${envapp}-RDS-CF-Stack-${build_number}"
+                          echo "${stackname} is the STACKNAME"
+                          dbidentifier="${envapp}-oracle-${currentBuild.number}"
+                          echo "${dbidentifier} is dbidentifier"
+                          replicadbidentifier="${params.Environment}-usw2-${params.Database}-replica-${build_number}"
+                          echo "${replicadbidentifier} is replicadbidentifier"
+                          enginetype="oracle-ee"
+                          echo "${enginetype} is enginetype"
+                          snapshot_arn="${params.InputSnapshotARN}"
+                          echo "$snapshot_arn"
+                          appid="95A37131-CEBF-4969-9D54-36BBA741B91F"
+                          
+                      } else {   
+                      
+                         rgn()
+                          build_number="${params.BuildNumber}"
+                          envapp="${params.Environment}-${params.REGION}-${params.Database}"
+                          echo "${envapp} is the Enviroment-Region-APPName"
+                          echo "${build_number} is input buildnumber of the job"
+                          stackname="${envapp}-RDS-CF-Stack-${build_number}"
+                          echo "${stackname} is the STACKNAME"
+                          //dbusername="rdsmstr"
+                          //echo "${dbusername} is dbusername"
+                          //dbpassword="Rdsmstr_4378"
+                          //echo "${dbpassword} is dbpassword"
+                          dbidentifier="${envapp}-oracle-${build_number}"
+                          echo "${dbidentifier} is dbidentifier"
+                          replicadbidentifier="dr-usw2-${params.Database}-replica-${build_number}"
+                          echo "${replicadbidentifier} is replicadbidentifier"
+                          enginetype="oracle-ee"
+                          echo "${enginetype} is enginetype"
+                          snapshot_arn="${params.InputSnapshotARN}"
+                          echo "$snapshot_arn"
+                          appid="95A37131-CEBF-4969-9D54-36BBA741B91F"
+                      
+                      }              
+                   
+                }
+}

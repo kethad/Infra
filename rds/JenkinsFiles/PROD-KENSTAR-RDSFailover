@@ -1,0 +1,79 @@
+pipeline {
+    agent { label ' USE1-SLAVE-01 || USW2-SLAVE-01 '}
+    
+    stages {    
+             
+	    stage ('Echo Selected Parameters') {
+             steps {
+                 echo "${params.Environment} ${params.APP} ${params.STAGES}"
+             }
+             
+         }
+            stage('Unplanned-Failover') {
+                  when { expression { params.STAGES == 'Unplanned-Failover'  } } 
+                  steps {
+		                       //appname()
+				       //failoverregion()
+		                       sh "cd ./rds; chmod +x py3ManageDNSwZone.py py3reportRoute53Records_prod.py aurora-unplanned-failover.py"
+                	               //sh "./rds/carepromotereplica.py ${APPNAME}"
+				       sh "./rds/aurora-unplanned-failover.py ${params.Environment} ${params.APP}"
+                        }
+            }
+	     
+	    stage('Failover-stage') {
+	        when { expression { params.STAGES == 'Failover-To-USE1' || params.STAGES == 'Failover-To-USW2' } } 
+                  steps {
+		                        failoverregion()
+		                        sh "echo ${params.STAGES}"
+		                        sh "cd ./rds; chmod +x py3ManageDNSwZone.py py3reportRoute53Records_prod.py aurora_serverless_failover.py"
+                	                sh "./rds/aurora_serverless_failover.py ${params.Environment} ${params.APP} ${failoverregion} "
+                        }
+            }
+	   
+    }
+    
+ post {
+        failure {
+        
+                 mail to: 'KenstarSupport@spglobal.com,IndexInfraMBX@spglobal.com,IndexInfraNotifications@spglobal.com',
+                 subject: "RDSStack: Serverless Aurora Mysql ${params.STAGES} Job is Failed for : ${params.Environment} Environment ${env.BUILD_NUMBER} BuildNumber",
+                 body: "RDSStack: Serverless Aurora Mysql ${params.STAGES} Job is Failed for: ${params.Environment} Environemnt ${env.BUILD_NUMBER} BuildNumber, for more details click on the url ${env.BUILD_URL}console "
+        }
+        
+        success {
+                          
+                 mail to: 'KenstarSupport@spglobal.com,IndexInfraMBX@spglobal.com,IndexInfraNotifications@spglobal.com',
+                 subject: "RDSStack: Serverless Aurora Mysql ${params.STAGES} Job is Successful for: ${params.Environment} Environemnt ${env.BUILD_NUMBER} BuildNumber",
+                 body: "RDSStack: Serverless Aurora Mysql ${params.STAGES} Job is Successful for: ${params.Environment} Environment ${env.BUILD_NUMBER} BuildNumber, YOU CAN ACCESS RDS WITH SAME DNS NAME"                 
+               }
+			   
+	}
+}
+
+void appname() {
+            script {
+                        if ( params.Environment == 'PROD' ) {
+                              APPNAME="PROD-USE1-CARE"
+                              echo "${APPNAME} is ENVAPP" 
+                        } else {
+                             echo "Please select the Right Environment"
+                        }
+                          
+            }
+}
+
+void failoverregion() {
+            script {
+                        if ( params.STAGES == 'Failover-To-USE1' ) {
+                              failoverregion="us-east-1"
+                              echo "${failoverregion} is failoverregion" 
+                        } else if ( params.STAGES == 'Failover-To-USW2' ) {
+			      failoverregion="us-west-2"
+                              echo "${failoverregion} is failoverregion" 
+                        } else {
+			   
+			   echo "input region is empty"
+			}
+                          
+            }
+}
