@@ -1,0 +1,187 @@
+---
+- hosts: localhost
+  become: yes
+  gather_facts: false
+  tasks:
+    - name: envapp debug
+      debug:
+        msg: "{{ envapp }}"
+
+    - name: buildnumber debug
+      debug:
+        msg: "{{ build_number }}"
+
+    - name: enginetype debug
+      debug:
+        msg: "{{ enginetype }}"
+
+    - name: Fetch Zone Name
+      shell: ./RetrieveRDSDNS.py "{{ envapp }}" RW Zone
+      register: zone
+      
+    - name: Zone Debug
+      debug:
+        msg: "{{ zone.stdout }}"
+
+    - name: Fetch RDS VADNSRecord
+      shell: ./RetrieveRDSDNS.py "{{ envapp }}" RW VADNSRecord
+      register: varwdns
+
+    - name: RDS VADNSRecord debug
+      debug:
+        msg: "{{ varwdns.stdout }}"
+        
+    - name: Fetch RDS ORDNSRecord
+      shell: ./RetrieveRDSDNS.py "{{ envapp }}" RW ORDNSRecord
+      register: orrwdns
+      
+    - name: RDS RW ORDNSRecord debug
+      debug:
+        msg: "{{ orrwdns.stdout }}"
+      
+    - name: featch RDS Primary RO DNSRecord
+      shell: ./RetrieveRDSDNS.py "{{ envapp }}" RW  VARODNSRecord
+      register: varodns
+
+    - name: Debug of Primary RO record
+      debug:
+        msg: "{{ varodns.stdout }}"
+      
+    - name: featch RDS Secondary RO DNSRecord
+      shell: ./RetrieveRDSDNS.py "{{ envapp }}" RW  ORRODNSRecord
+      register: orrodns
+      
+    - name: debug of RDS Secondary RO record
+      debug:
+        msg: "{{ orrodns.stdout }}"
+
+
+    - name: Featch aurora mysql PrimaryReaderEndpoint value
+      shell: ./RetrieveBuildInfo.py "{{ envapp }}" "{{ build_number }}"  PrimaryReaderEndpoint
+      #when: enginetype == "aurora-postgresql"
+      register: prrdendpoint
+
+    - name: Debug of PrimaryReaderEndpoint
+      debug:
+        msg: "{{ prrdendpoint.stdout}}"
+      #when: enginetype == "aurora-postgresql"
+
+    - name: Featch Aurora mysql PrimaryWriterEndpoint value
+      shell: ./RetrieveBuildInfo.py "{{ envapp }}" "{{ build_number }}" PrimaryWriterEndpoint
+      register: prwrendpoint 
+
+    - name: debug of PrimaryWriterEndpoint
+      debug:
+        msg: "{{ prwrendpoint.stdout }}"
+      
+    - name: Featch aurora mysql Secondary ReaderEndPoint value
+      shell: ./RetrieveBuildInfo.py "{{ envapp }}" "{{ build_number }}"  SecondaryReaderEndPoint
+      register: scrdendpoint     
+
+    - name: debug of Secondary ReaderEndPoint
+      debug:
+        msg: "{{ scrdendpoint.stdout}}"
+
+    - name: Featch Aurora Postgresql Secondary WriterEndPoint value
+      shell: ./RetrieveBuildInfo.py "{{ envapp }}" "{{ build_number }}"  SecondaryWriterEndPoint
+      register: scwrendpoint
+
+    - name: debug of Secondary WriterEndPoint
+      debug:
+        msg: "{{ scwrendpoint.stdout }}"
+      
+    - name: Getting Session of Assume Role
+      #hosts: dev-infra
+      sts_assume_role:
+        region: us-east-1
+        role_arn: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+        role_session_name: spdji-provision
+      delegate_to: prod.infra.spdji.com
+      register: assumed_role
+      #remote_user: infra
+      
+    - name: Map Aurora Mysql VADNSRecord with Primary WriterEndPoint
+      route53:
+          aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+          aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+          security_token: "{{ assumed_role.sts_creds.session_token }}"
+          state: present
+          private_zone: yes
+          zone: "{{ zone.stdout }}"
+          record: "{{ varwdns.stdout }}"
+          type: CNAME
+          value: "{{ prwrendpoint.stdout }}"
+          overwrite: yes
+      when: zone.stdout is defined  and  varwdns.stdout is defined  and  prwrendpoint.stdout is defined
+
+    - name: Map Aurora Mysql ORDNSRecord with Secondary WriterEndPoint
+      route53:
+          aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+          aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+          security_token: "{{ assumed_role.sts_creds.session_token }}"
+          state: present
+          private_zone: yes
+          zone: "{{ zone.stdout }}"
+          record: "{{ orrwdns.stdout }}"
+          type: CNAME
+          value: "{{ scwrendpoint.stdout }}"
+          overwrite: yes
+      when: zone.stdout is defined  and  orrwdns.stdout is defined  and  scwrendpoint.stdout is defined
+
+
+    - name: Map Aurora Mysql Primary RODNSRecrod with Primary ReaderEndPoint
+      route53:
+          aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+          aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+          security_token: "{{ assumed_role.sts_creds.session_token }}"
+          state: present
+          private_zone: yes
+          zone: "{{ zone.stdout }}"
+          record: "{{ varodns.stdout }}"
+          type: CNAME
+          value: "{{ prrdendpoint.stdout }}"
+          overwrite: yes
+      when: zone.stdout is defined  and  varodns.stdout is defined  and  prrdendpoint.stdout is defined
+
+    - name: Map Aurora Mysql ORRODNSRecrod with Secondary ReaderEndPoint
+      route53:
+          aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+          aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+          security_token: "{{ assumed_role.sts_creds.session_token }}"
+          state: present
+          private_zone: yes
+          zone: "{{ zone.stdout }}"
+          record: "{{ orrodns.stdout }}"
+          type: CNAME
+          value: "{{ scrdendpoint.stdout }}"
+          overwrite: yes
+      when: zone.stdout is defined  and  orrodns.stdout is defined  and  scrdendpoint.stdout is defined
+      
+    - name: Update RW BuildNumber to the RDS-DNS-INVENTORY Table
+      shell: ./UpdateRDSDNS.py AppName="{{ envapp }}"  Mode=RW BuildNumber="{{ build_number }}"
+      
+    - name: Creating file headings
+      shell: " echo -e 'DNSRecord-Name    :  RDS-EndPoints\n-------------------------------------------------' > {{ envapp }}.rdsdnsupdate.txt "
+
+    - name: Writing into file - Aurora Mysql VADNSRecord and Primary writer EndPoint
+      shell: "echo {{ varwdns.stdout }} :   {{ prwrendpoint.stdout }} >> {{ envapp }}.rdsdnsupdate.txt "
+      when: varwdns.stdout is defined  and  prwrendpoint.stdout is defined
+
+    - name: Writing into file - Aurora Mysql VARODNSRecord and Primary Reader EndPoint
+      shell: "echo {{ varodns.stdout }} :   {{ prrdendpoint.stdout }} >> {{ envapp }}.rdsdnsupdate.txt "
+      when: varodns.stdout is defined  and  prrdendpoint.stdout is defined
+      
+    - name: Writing into file - Aurora Mysql ORRWDNSRecord and Secondary Writer EndPoint
+      shell: "echo {{ orrwdns.stdout }} :   {{ scwrendpoint.stdout }} >> {{ envapp }}.rdsdnsupdate.txt "
+      when: orrwdns.stdout is defined  and  scwrendpoint.stdout is defined
+
+    - name: Writing into file - Aurora Mysql ORRODNSRecord and Secondary Reader EndPoint
+      shell: "echo {{ orrodns.stdout }} :   {{ scrdendpoint.stdout }} >> {{ envapp }}.rdsdnsupdate.txt "
+      when: orrodns.stdout is defined  and  scrdendpoint.stdout is defined
+
+    - name: make sure rdsdnsupdate.txt file is owned by jenkins user
+      file:
+        path: "{{ envapp }}.rdsdnsupdate.txt"
+        owner: jenkins
+        group: jenkins
+        mode: 0644

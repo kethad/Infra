@@ -1,0 +1,249 @@
+---
+- hosts: localhost
+  become: yes
+  gather_facts: false
+  vars:
+    pzone: false
+  tasks:
+    - name: envapp debug
+      debug:
+        msg: "{{ envapp }}"
+
+    - name: buildnumber debug
+      debug:
+        msg: "{{ build_number }}"
+
+    - name: enginetype debug
+      debug:
+        msg: "{{ enginetype }}"
+
+    - name: Fetch Zone Name
+      shell: ./RetrieveRDSDNS.py "{{ envapp }}" RW Zone
+      register: zone
+      
+    - name: Zone Debug
+      debug:
+        msg: "{{ zone.stdout }}"
+
+    - name: Fetch RDS RW DNSRecord
+      shell: ./RetrieveRDSDNS.py "{{ envapp }}" RW DNSRecord
+      register: rwdns
+
+    - name: RDS RW DNSRecord debug
+      debug:
+        msg: "{{ rwdns.stdout }}"
+        
+    - name: Fetch DR RDS RW DNSRecord
+      shell: ./RetrieveRDSDNS.py "{{ envapp }}" RW DRDNSRecord
+      register: drrwdns
+      when: enginetype == "aurora-postgresql"
+      
+    - name: DR RDS RW DNSRecord debug
+      debug:
+        msg: "{{ drrwdns.stdout }}"
+      when: enginetype == "aurora-postgresql"
+      
+    - name: featch RDS Primary RO DNSRecord
+      shell: ./RetrieveRDSDNS.py "{{ envapp }}" RO  DNSRecord
+      when: enginetype == "aurora-postgresql"
+      register: rodns
+
+    - name: Debug of Primary RO record
+      debug:
+        msg: "{{ rodns.stdout }}"
+      when: enginetype == "aurora-postgresql"
+      
+    - name: featch RDS Secondary RO DNSRecord
+      shell: ./RetrieveRDSDNS.py "{{ envapp }}" RO  DRDNSRecord
+      when: enginetype == "aurora-postgresql"
+      register: drrodns
+      
+    - name: debug of RDS Secondary RO record
+      debug:
+        msg: "{{ drrodns.stdout }}"
+      when: enginetype == "aurora-postgresql"
+      
+
+
+    - name: Fetch MySQL EndPoint value
+      shell: ./RetrieveBuildInfo.py "{{ envapp }}" "{{ build_number }}" EndPoint
+      when: enginetype == "mysql"
+      register: endpoint
+
+    - name: debug of mysql endpoint
+      debug:
+        msg: "{{ endpoint.stdout }}"
+      when: enginetype == "mysql"
+      
+
+
+    - name: Featch aurora postgresql PrimaryReaderEndpoint value
+      shell: ./RetrieveBuildInfo.py "{{ envapp }}" "{{ build_number }}"  PrimaryReaderEndpoint
+      when: enginetype == "aurora-postgresql"
+      register: prrdendpoint
+
+    - name: Debug of PrimaryReaderEndpoint
+      debug:
+        msg: "{{ prrdendpoint.stdout}}"
+      when: enginetype == "aurora-postgresql"
+
+    - name: Featch Aurora Postgresql PrimaryClusterEndpoint value
+      shell: ./RetrieveBuildInfo.py "{{ envapp }}" "{{ build_number }}" PrimaryClusterEndpoint
+      when: enginetype == "aurora-postgresql"
+      register: prclsendpoint
+
+    - name: debug of PrimaryClusterEndpoint
+      debug:
+        msg: "{{ prclsendpoint.stdout }}"
+      when: enginetype == "aurora-postgresql"
+      
+      
+      
+    - name: Featch aurora postgresql DR DRReaderEndPoint value
+      shell: ./RetrieveBuildInfo.py "{{ envapp }}" "{{ build_number }}"  DRReaderEndPoint
+      when: enginetype == "aurora-postgresql"
+      register: drrdendpoint
+
+    - name: debug of DRReaderEndPoint
+      debug:
+        msg: "{{ drrdendpoint.stdout}}"
+      when: enginetype == "aurora-postgresql"
+
+    - name: Featch Aurora Postgresql DRWriterEndPoint value
+      shell: ./RetrieveBuildInfo.py "{{ envapp }}" "{{ build_number }}"  DRWriterEndPoint
+      when: enginetype == "aurora-postgresql"
+      register: drwrendpoint
+
+    - name: debug of DRWriterEndPoint
+      debug:
+        msg: "{{ drwrendpoint.stdout }}"
+      when: enginetype == "aurora-postgresql"
+      
+    - name: private_zone set-fact
+      set_fact:
+           pzone: true
+      when: zone.stdout is search("spdji.spgi")
+      #when: "'spdji.spgi' in lb_zone"
+
+    - name: debug of private_zone
+      debug:
+         msg: "{{ pzone }}"
+      
+
+    - name: Getting Session of Assume Role
+      #hosts: dev-infra
+      sts_assume_role:
+        region: us-east-1
+        role_arn: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+        role_session_name: spdji-provision
+      delegate_to: prod.infra.spdji.com
+      register: assumed_role
+      #remote_user: infra
+
+    - name: Map MySQL DNSRecrod with EndPoint
+      route53:
+          aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+          aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+          security_token: "{{ assumed_role.sts_creds.session_token }}"
+          state: present
+          private_zone: "{{ pzone }}"
+          zone: "{{ zone.stdout }}"
+          record: "{{ rwdns.stdout }}"
+          type: CNAME
+          value: "{{ endpoint.stdout }}"
+          overwrite: yes
+      when: enginetype == "mysql"  and  zone.stdout is defined  and  rwdns.stdout is defined  and  endpoint.stdout is defined
+
+    - name: Map Aurora PostgreSQL DNSRecord with PrimaryClusterEndPoint
+      route53:
+          aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+          aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+          security_token: "{{ assumed_role.sts_creds.session_token }}"
+          state: present
+          private_zone: "{{ pzone }}"
+          zone: "{{ zone.stdout }}"
+          record: "{{ rwdns.stdout }}"
+          type: CNAME
+          value: "{{ prclsendpoint.stdout }}"
+          overwrite: yes
+      when: enginetype == "aurora-postgresql"  and  zone.stdout is defined  and  rwdns.stdout is defined  and  prclsendpoint.stdout is defined
+
+    - name: Map Aurora PostgreSQL DNSRecord with DRWriterEndPoint
+      route53:
+          aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+          aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+          security_token: "{{ assumed_role.sts_creds.session_token }}"
+          state: present
+          private_zone: "{{ pzone }}"
+          zone: "{{ zone.stdout }}"
+          record: "{{ drrwdns.stdout }}"
+          type: CNAME
+          value: "{{ drwrendpoint.stdout }}"
+          overwrite: yes
+      when: enginetype == "aurora-postgresql"  and  zone.stdout is defined  and  drrwdns.stdout is defined  and  drwrendpoint.stdout is defined
+
+
+    - name: Map Aurora PostgreSQL Primary RO DNSRecrod with PrimaryReaderEndPoint
+      route53:
+          aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+          aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+          security_token: "{{ assumed_role.sts_creds.session_token }}"
+          state: present
+          private_zone: "{{ pzone }}"
+          zone: "{{ zone.stdout }}"
+          record: "{{ rodns.stdout }}"
+          type: CNAME
+          value: "{{ prrdendpoint.stdout }}"
+          overwrite: yes
+      when: enginetype == "aurora-postgresql"  and  zone.stdout is defined  and  rodns.stdout is defined  and  prrdendpoint.stdout is defined
+
+    - name: Map Aurora PostgreSQL DR RO DNSRecrod with DRReaderEndPoint
+      route53:
+          aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+          aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+          security_token: "{{ assumed_role.sts_creds.session_token }}"
+          state: present
+          private_zone: "{{ pzone }}"
+          zone: "{{ zone.stdout }}"
+          record: "{{ drrodns.stdout }}"
+          type: CNAME
+          value: "{{ drrdendpoint.stdout }}"
+          overwrite: yes
+      when: enginetype == "aurora-postgresql"  and  zone.stdout is defined  and  drrodns.stdout is defined  and  drrdendpoint.stdout is defined
+      
+    - name: Update RW BuildNumber to the RDS-DNS-INVENTORY Table
+      shell: ./UpdateRDSDNS.py AppName="{{ envapp }}"  Mode=RW BuildNumber="{{ build_number }}"
+
+    - name: Update RO  BuildNumber to the RDS-DNS-INVENTORY Table
+      shell: ./UpdateRDSDNS.py AppName="{{ envapp }}"  Mode=RO BuildNumber="{{ build_number }}"
+      when: enginetype == "aurora-postgresql"
+      
+    - name: Creating file headings
+      shell: " echo -e 'DNSRecord-Name    :  RDS-EndPoints\n-------------------------------------------------' > {{ envapp }}.rdsdnsupdate.txt "
+
+    - name: Writing into file - Mysql DNSRecord and EndPoint
+      shell: "echo {{ rwdns.stdout }} :   {{ endpoint.stdout }} >> {{ envapp }}.rdsdnsupdate.txt "
+      when: enginetype == "mysql"  and rwdns.stdout is defined  and  endpoint.stdout is defined
+
+    - name: Writing into file - Aurora PostgreSQL RW DNSRecord and EndPoint
+      shell: "echo {{ rwdns.stdout }} :   {{ prclsendpoint.stdout }} >> {{ envapp }}.rdsdnsupdate.txt "
+      when: enginetype == "aurora-postgresql" and rwdns.stdout is defined  and  prclsendpoint.stdout is defined
+
+    - name: Writing into file - Aurora PostgreSQL RO DNSRecord and EndPoint
+      shell: "echo {{ rodns.stdout }} :   {{ prrdendpoint.stdout }} >> {{ envapp }}.rdsdnsupdate.txt "
+      when: enginetype == "aurora-postgresql" and rodns.stdout is defined  and  prrdendpoint.stdout is defined
+      
+    - name: Writing into file - Aurora PostgreSQL RW DNSRecord and EndPoint
+      shell: "echo {{ drrwdns.stdout }} :   {{ drwrendpoint.stdout }} >> {{ envapp }}.rdsdnsupdate.txt "
+      when: enginetype == "aurora-postgresql" and drrwdns.stdout is defined  and  drwrendpoint.stdout is defined
+
+    - name: Writing into file - Aurora PostgreSQL RO DNSRecord and EndPoint
+      shell: "echo {{ drrodns.stdout }} :   {{ drrdendpoint.stdout }} >> {{ envapp }}.rdsdnsupdate.txt "
+      when: enginetype == "aurora-postgresql" and drrodns.stdout is defined  and  drrdendpoint.stdout is defined
+
+    - name: make sure rdsdnsupdate.txt file is owned by jenkins user
+      file:
+        path: "{{ envapp }}.rdsdnsupdate.txt"
+        owner: jenkins
+        group: jenkins
+        mode: 0644

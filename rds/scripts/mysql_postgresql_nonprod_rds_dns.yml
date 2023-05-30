@@ -1,0 +1,205 @@
+---
+- hosts: localhost
+  become: yes
+  gather_facts: false
+  tasks:
+    - name: envapp debug
+      debug:
+        msg: "{{ envapp }}"
+
+    - name: buildnumber debug
+      debug:
+        msg: "{{ build_number }}"
+
+    - name: enginetype debug
+      debug:
+        msg: "{{ enginetype }}"
+    
+    - name: environment debug
+      debug:
+        msg: "{{ env }}"
+      ignore_errors: yes
+
+    - name: Fetch Zone Name
+      shell: ./RetrieveRDSDNS.py "{{ envapp }}" RW Zone
+      register: rdszone
+
+    - name: Zone Debug
+      debug:
+        msg: "{{ rdszone.stdout }}"
+
+    - name: Fetch RDS RW DNSRecord
+      shell: ./RetrieveRDSDNS.py "{{ envapp }}" RW DNSRecord
+      register: rdsrwdns
+
+    - name: RDS RW DNSRecord debug
+      debug:
+        msg: "{{ rdsrwdns.stdout }}"
+
+    - name: featch RDS RO DNSRecord
+      shell: ./RetrieveRDSDNS.py "{{ envapp }}" RO  DNSRecord
+      when: enginetype == "aurora-postgresql" or enginetype == "aurora-mysql"
+      register: rdsrodns
+
+    - name: debug of RO record
+      debug:
+        msg: "{{ rdsrodns.stdout }}"
+      when: enginetype == "aurora-postgresql" or enginetype == "aurora-mysql"
+      
+    - name: featch oracle-ee Beta RODNSRecord
+      shell: ./RetrieveRDSDNS.py "{{ envapp }}" RW  DRDNSRecord
+      when: enginetype == "oracle-ee" and env == 'BETA'
+      register: replicadrdns
+      ignore_errors: yes
+      
+    - name: debug of oracle-ee Beta DRDNSRecord
+      debug: 
+         msg: "{{ replicadrdns.stdout }}"
+      when: enginetype == "oracle-ee" and env == 'BETA'
+      ignore_errors: yes
+
+    - name: Fetch MySQL or oracle-ee or mssql  EndPoint value
+      shell: ./RetrieveBuildInfo.py "{{ envapp }}" "{{ build_number }}" EndPoint
+      when: enginetype == "mysql" or enginetype == "oracle-ee" or enginetype == "sqlserver-se"
+      register: endpoint
+
+    - name: debug of mysql or oracle-ee or msql endpoint or mssql
+      debug:
+        msg: "{{ endpoint.stdout }}"
+      when: enginetype == "mysql" or enginetype == "oracle-ee" or enginetype == "sqlserver-se"
+      
+    - name: Fetch oracle-ee ReplicaEndPoint
+      shell: ./RetrieveBuildInfo.py "{{ envapp }}" "{{ build_number }}" ReplicaEndPoint
+      when: enginetype == "oracle-ee" and env == 'BETA'
+      register: replicaendpoint
+      ignore_errors: yes
+      
+    - name: debug of oracle-ee ReplicaEndpoint
+      debug:
+        msg: "{{ replicaendpoint.stdout }}"
+      when: enginetype == "oracle-ee" and env == 'BETA'
+      ignore_errors: yes
+
+    - name: Featch aurora postgresql ReaderPoint value
+      shell: ./RetrieveBuildInfo.py "{{ envapp }}" "{{ build_number }}"  ReaderEndpoint
+      when: enginetype == "aurora-postgresql" or enginetype == "aurora-mysql"
+      register: rendpoint
+
+    - name: debug of ReaderEndPoint
+      debug:
+        msg: "{{ rendpoint.stdout}}"
+      when: enginetype == "aurora-postgresql" or enginetype == "aurora-mysql"
+
+    - name: Featch Aurora Postgresql ClusterEndpoint value
+      shell: ./RetrieveBuildInfo.py "{{ envapp }}" "{{ build_number }}" ClusterEndpoint
+      when: enginetype == "aurora-postgresql" or enginetype == "aurora-mysql"
+      register: cendpoint
+
+
+    - name: debug of ClusterEndPoint
+      debug:
+        msg: "{{ cendpoint.stdout }}"
+      when: enginetype == "aurora-postgresql" or enginetype == "aurora-mysql"
+
+    - name: Getting Session of Assume Role
+      #hosts: dev-infra
+      sts_assume_role:
+        region: us-east-1
+        role_arn: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+        role_session_name: spdji-provision
+      delegate_to: infra.spdji.com
+      register: assumed_role
+      #remote_user: infra
+
+    - name: Map MySQL or oracle-ee or mssql DNSRecrod with EndPoint
+      route53:
+          aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+          aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+          security_token: "{{ assumed_role.sts_creds.session_token }}"
+          state: present
+          private_zone: yes
+          zone: "{{ rdszone.stdout }}"
+          record: "{{ rdsrwdns.stdout }}"
+          type: CNAME
+          value: "{{ endpoint.stdout }}"
+          overwrite: yes
+      when: enginetype == "mysql" or enginetype == "oracle-ee" or enginetype == "sqlserver-se"  and  rdszone.stdout is defined  and  rdsrwdns.stdout is defined  and  endpoint.stdout is defined
+      
+    
+    - name: Map oracle-ee DRDNSRecrod with ReplicaEndPoint
+      route53:
+          aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+          aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+          security_token: "{{ assumed_role.sts_creds.session_token }}"
+          state: present
+          private_zone: yes
+          zone: "{{ rdszone.stdout }}"
+          record: "{{ replicadrdns.stdout }}"
+          type: CNAME
+          value: "{{ replicaendpoint.stdout }}"
+          overwrite: yes
+      when: enginetype == "oracle-ee" and  rdszone.stdout is defined  and  replicadrdns.stdout is defined  and  replicaendpoint.stdout is defined
+
+
+
+    - name: Map Aurora PostgreSQL DNSRecord with ClusterEndPoint
+      route53:
+          aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+          aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+          security_token: "{{ assumed_role.sts_creds.session_token }}"
+          state: present
+          private_zone: yes
+          zone: "{{ rdszone.stdout }}"
+          record: "{{ rdsrwdns.stdout }}"
+          type: CNAME
+          value: "{{ cendpoint.stdout }}"
+          overwrite: yes
+      when: enginetype == "aurora-postgresql" or enginetype == "aurora-mysql"  and  rdszone.stdout is defined  and  rdsrwdns.stdout is defined  and  cendpoint.stdout is defined
+
+    - name: Map Aurora PostgreSQL RO DNSRecrod with ReaderEndPoint
+      route53:
+          aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+          aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+          security_token: "{{ assumed_role.sts_creds.session_token }}"
+          state: present
+          private_zone: yes
+          zone: "{{ rdszone.stdout }}"
+          record: "{{rdsrodns.stdout }}"
+          type: CNAME
+          value: "{{ rendpoint.stdout }}"
+          overwrite: yes
+      when: enginetype == "aurora-postgresql" or enginetype == "aurora-mysql"  and  rdszone.stdout is defined  and  rdsrodns.stdout is defined  and  rendpoint.stdout is defined
+
+    - name: Update RW BuildNumber to the RDS-DNS-INVENTORY Table
+      shell: ./UpdateRDSDNS.py AppName="{{ envapp }}"  Mode=RW BuildNumber="{{ build_number }}"
+
+    - name: Update RO  BuildNumber to the RDS-DNS-INVENTORY Table
+      shell: ./UpdateRDSDNS.py AppName="{{ envapp }}"  Mode=RO BuildNumber="{{ build_number }}"
+      when: enginetype == "aurora-postgresql" or enginetype == "aurora-mysql"
+      
+    - name: Creating file headings
+      shell: " echo -e 'DNSRecord-Name    :  RDS-EndPoints\n-------------------------------------------------' > {{ envapp }}.rdsdnsupdate.txt "
+
+    - name: Writing into file - Mysql or oracle-ee DNSRecord and EndPoint
+      shell: "echo {{ rdsrwdns.stdout }} :   {{ endpoint.stdout }} >> {{ envapp }}.rdsdnsupdate.txt "
+      when: enginetype == "mysql" or enginetype == "oracle-ee" or  enginetype == "sqlserver-se"
+      
+    - name: Writing into file - oracle-ee DRDNSRecord and ReplicaEndPoint
+      shell: "echo {{ replicadrdns.stdout }} :   {{ replicaendpoint.stdout }} >> {{ envapp }}.rdsdnsupdate.txt "
+      when: enginetype == "oracle-ee" and env == 'BETA'
+      ignore_errors: yes
+
+    - name: Writing into file - Aurora PostgreSQL RW DNSRecord and EndPoint
+      shell: "echo {{ rdsrwdns.stdout }} :   {{ cendpoint.stdout }} >> {{ envapp }}.rdsdnsupdate.txt "
+      when: enginetype == "aurora-postgresql" or enginetype == "aurora-mysql"
+
+    - name: Writing into file - Aurora PostgreSQL RO DNSRecord and EndPoint
+      shell: "echo {{ rdsrodns.stdout }} :   {{ rendpoint.stdout }} >> {{ envapp }}.rdsdnsupdate.txt "
+      when: enginetype == "aurora-postgresql" or enginetype == "aurora-mysql"
+
+    - name: make sure rdsdnsupdate.txt file is owned by jenkins user
+      file:
+        path: "{{ envapp }}.rdsdnsupdate.txt"
+        owner: jenkins
+        group: jenkins
+        mode: 0644
