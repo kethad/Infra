@@ -1,0 +1,158 @@
+---
+    - name: clean expire-cache - RH7
+      shell: yum clean expire-cache
+      when: ansible_distribution_release|string == 'Maipo'
+
+    ###- name: Installing httpd packages for RHEL7
+    ###  yum:
+    ###    name: ['apr', 'apr-util', 'pcre', 'distcache', 'distcache-devel' ]
+    ###    enablerepo: SPDJI_mhfi_prod_repo_APP
+    ###    disablerepo: "*"
+    ###    state: latest
+    ###  when: ansible_distribution_release|string == 'Maipo'
+    ###  ignore_errors: true
+
+    - name: Installing httpd packages for RHEL7
+      yum:
+        name: ['httpd', 'httpd-tools', 'mod_ssl', 'SPG_Extra', 'mod_authnz_ldap' ]
+        enablerepo: SPDJI_mhfi_prod_repo_APP
+        disablerepo: "*"
+        state: latest
+      when: ansible_distribution_release|string == 'Maipo'
+      ignore_errors: true
+
+    - name: clean expire-cache - RH8
+      shell: dnf clean expire-cache
+      when: ansible_distribution_release|string == 'Ootpa'
+      
+    - name: Installing httpd packages for RHEL8
+      dnf:
+        name: ['httpd', 'httpd-tools', 'mod_ssl', 'mod_authnz_ldap']
+        enablerepo: SPDJI_mhfi_prod_repo_Apache
+        disablerepo: "*"
+        state: latest
+      when: ansible_distribution_release|string == 'Ootpa'
+      ignore_errors: true
+
+     #### make local user directories
+
+    - name: Create local_apps perms
+      file:
+        path: /local/apps
+        state: directory
+        mode: 0755
+      ignore_errors: true
+
+    - name: remove exisitng sym link to httpd
+      file:
+        path: /local/apps/apache/httpd-2.4
+        state: absent
+      ignore_errors: true
+
+    - name: get latet installed apache location
+      shell: ls -d `rpm -qa |grep httpd |egrep -v "tools|devel" |awk -F "-" '{print $1"-"$2}'` 2>/dev/null
+      args:
+        chdir: /local/apps/apache/
+      register: httpd_rpm
+      ignore_errors: true
+
+    - name: Create apache symlink
+      file:
+        src="/local/apps/apache/{{ httpd_rpm.stdout }}"
+        dest="/local/apps/apache/httpd-2.4"
+        state=link
+        force=yes
+      ignore_errors: true
+
+    - name: Create run
+      file:
+        path: /local/apps/apache/httpd-2.4/run
+        state: directory
+        mode: 0755
+
+    - name: Create libpcre symlinks
+      file:
+        src="/usr/lib64/libpcre.so.1"
+        dest="/lib64/libpcre.so.0"
+        state=link
+        force=yes
+        owner=root
+        group=root
+      ignore_errors: true
+
+    - name: Create libdb symlinks
+      file:
+        src="/usr/lib64/libdb-5.3.so"
+        dest="/usr/lib64/libdb-4.7.so"
+        state=link
+        force=yes
+        owner=root
+        group=root
+      ignore_errors: true
+
+    - name: Change the owner of apache app dir
+      file: dest=/local/apps/apache/ owner=apache group=apache recurse=yes
+      ignore_errors: true
+
+    - name: update permission of mh-extra
+      shell: chmod -R 755 /local/apps/apache/mh-extra
+      ignore_errors: true     ##remove it later its for temporarly
+
+    - name: "wget mod_wsgi"
+      get_url:
+        url: https://artifactory-use-prod.cicd.spglobal.com/artifactory/pe-build-middleware-Prod/apache/rhel7/mod_wsgi.so
+        dest: /local/apps/apache/httpd-2.4/modules
+        mode: '0755'
+      ignore_errors: true
+
+    - name: "insert mod_wsgi into httpd.conf"
+      shell: sed -i '70i  LoadModule wsgi_module modules/mod_wsgi.so' /local/apps/apache/httpd-2.4/httpd/conf/httpd.conf
+      ignore_errors: true
+
+    - name: Clean up rpm files
+      shell: rm -f httpd*.rpm
+      args:
+        chdir: /local/apps
+      ignore_errors: true
+
+    - name: Check the new version of apache
+      shell: rpm -q httpd | grep -i "httpd-2"
+      ignore_errors: true
+      register: httpd_new_status
+
+    - debug: var=httpd_new_status.stdout
+      ignore_errors: true
+
+    - name: Get Apache update status
+      shell: |
+        hostname -i
+        old_version={{ httpd_status.stdout }};
+        new_version={{ httpd_new_status.stdout }};
+        echo $old_version $new_version;
+        if [[ $old_version != $new_version ]]; then echo "Apache-Upgraded-successfully";
+        else echo "Apache-Not-Upgraded"; fi
+      ignore_errors: true
+      register: apache_upgrade_status
+
+    - name: Create File and update Header
+      lineinfile:
+        state: present
+        create: yes
+        owner: jenkins
+        group: jenkins
+        mode: 0755
+        insertafter: EOF
+        path: "{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/apache-tomcat-status-{{ ENV }}-{{ currentDate }}.log"
+        line: ""
+      delegate_to: localhost
+      ignore_errors: true
+
+    - name: Update Apache status to a file
+      lineinfile:
+        state: present
+        insertafter: EOF
+        path: "{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/apache-tomcat-status-{{ ENV }}-{{ currentDate }}.log"
+        line: "{{ apache_upgrade_status.stdout | replace('\n', ' ') | replace('\"', '') }}"
+      delegate_to: localhost
+      ignore_errors: true
+

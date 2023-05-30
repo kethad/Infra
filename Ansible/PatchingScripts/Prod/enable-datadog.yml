@@ -1,0 +1,28 @@
+---
+  - hosts: all
+    become: true
+    ignore_unreachable: yes
+    tasks:
+      - name: Checking the datadog service is enabled or not
+        shell: systemctl is-enabled datadog-agent
+        register: datadog_enable
+        ignore_errors: yes
+
+      - name: Checking the datadog service is active or not
+        shell: systemctl is-active datadog-agent
+        # register: datadog_enable
+        ignore_errors: yes
+        
+      - name: Modify Permissions on the datadog directory
+        file:
+          path: /opt/datadog-agent
+          mode: 0750
+          state: directory
+          recurse: yes
+
+      - name: Enabling and Starting the service
+        systemd:
+          enabled: yes
+          state: restarted
+          daemon_reload: yes
+          name: datadog-agent

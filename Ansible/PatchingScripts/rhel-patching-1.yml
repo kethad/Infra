@@ -1,0 +1,60 @@
+---
+  - name: Patch RH7 & RH8 Servers
+    hosts: all
+    gather_facts: yes
+    become: yes
+    become_user: root
+    ignore_unreachable: yes
+    tasks:
+
+      - name: clean all - RH7
+        shell: yum clean metadata
+        when: "ansible_distribution_release|string == 'Maipo'"
+
+      - name: RHEL7 Install package updates
+        yum: name="*" state=latest
+        when: "ansible_distribution_release|string == 'Maipo'"
+        ignore_errors: yes
+
+      - name: Sleep for a min
+        pause:
+           seconds: 10
+           
+#      - name: Cleanup incomplete transaction
+#        shell: "yum-complete-transaction --cleanup-only"
+#        when: ansible_distribution == "RedHat" and ansible_distribution_major_version == "7"
+
+#      - name: RHEL7 upgrade kernel package
+#        yum: name="kernel*" state=latest
+#        when: "ansible_distribution_release|string == 'Maipo'"
+#        ignore_errors: yes
+
+#      - name: RHEL8 removing kmod packaes
+#        dnf: name=['kmod-redhat-oracleasm-kernel_4_18_0_240', 'kmod-redhat-oracleasm-kernel_4_18_0_240_14_1'] state=absent
+#        when: "ansible_distribution_release|string == 'Ootpa'"
+
+      - name: clean all - RH8
+        shell: dnf clean metadata
+        when: "ansible_distribution_release|string == 'Ootpa'"
+        
+      - name: RHEL8 upgrade kernel package
+        dnf: name="*" state=latest 
+        when: "ansible_distribution_release|string == 'Ootpa'"
+        ignore_errors: yes
+
+#      - name: Downgrade the kmod package
+#        dnf: 
+#           name: https://foreman.infra.spdji.spgi/pub/kmod-redhat-oracleasm-2.0.8-12.2.el8.x86_64.rpm
+#           state: present
+#           allow_downgrade: true
+#        when: "ansible_distribution_release|string == 'Ootpa'"
+#        ignore_errors: yes
+
+#     - name: Sleep for a min
+#       pause:
+#          seconds: 10
+
+      #- name: RHEL8 Patching is in progress
+        #dnf: name="*" state=latest exclude="kernel*"
+        #when: "ansible_distribution_release|string == 'Ootpa'"
+        #ignore_errors: yes

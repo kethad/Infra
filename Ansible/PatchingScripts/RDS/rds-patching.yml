@@ -1,0 +1,6 @@
+---
+- name: "Playbook for RDS Patching"
+  hosts: localhost
+  connection: local
+  roles:
+    - RDS

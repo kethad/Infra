@@ -1,0 +1,13 @@
+---
+ - hosts: all
+   ignore_unreachable: yes
+   become: true
+   gather_facts: no
+   become_user: root
+
+   tasks:
+   - name: Wait for SSH to come up
+     wait_for_connection:
+        delay: 60
+        timeout: 180
+     ignore_errors: true

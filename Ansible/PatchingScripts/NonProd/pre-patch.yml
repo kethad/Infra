@@ -1,0 +1,62 @@
+- hosts: all
+  ignore_unreachable: yes
+  gather_facts: yes
+  tasks:
+    - name: Get EC2 Name and current version of kernel
+      shell: |
+        hostname -i;
+        INSTANCE_ID=$(/usr/local/bin/aws ec2 describe-instances --region "{{ REGION }}" --filter Name=private-ip-address,Values="{{ inventory_hostname }}" --query 'Reservations[].Instances[].InstanceId' --output text);
+        INSTANCE_NAME=$(/usr/local/bin/aws ec2 describe-tags --region "{{ REGION }}" --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=Name" --output text | cut -f5); echo $INSTANCE_NAME;
+        CURRENT_KERNEL=$(uname -r);
+        echo $CURRENT_KERNEL;
+      register: pre_patch_status
+
+    - debug:
+        msg: "{{ pre_patch_status.stdout }}"
+
+    - name: Create File and update Header
+      lineinfile:
+        state: present
+        create: yes
+        owner: jenkins
+        group: jenkins
+        mode: 0755
+        insertafter: EOF
+        path: "{{workpath}}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/prepatch-{{ENV}}-kernelversion-{{ ansible_date_time.date }}.log"
+        line: ""
+      delegate_to: localhost
+      run_once: true
+
+    - name: Updating RH7 Patch Status
+      lineinfile:
+        state: present
+        insertafter: EOF
+        path: "{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/prepatch-{{ENV}}-kernelversion-{{ ansible_date_time.date }}.log"
+        line: "{{ pre_patch_status.stdout | replace('\n', ' ') | replace('\"', ' ') }}"
+      delegate_to: localhost
+
+    - name: Convert pre patch Log file to HTML File
+      shell: "{{ workpath }}/convert_prepatch.sh < {{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/prepatch-{{ ENV }}-kernelversion-{{ ansible_date_time.date }}.log > {{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/prepatch-{{ ENV }}-kernelversion-{{ ansible_date_time.date }}.html"
+      delegate_to: localhost
+      ignore_errors: yes
+
+    - name: Change file permissions
+      file:
+        path: "{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/prepatch-{{ ENV }}-kernelversion-{{ ansible_date_time.date }}.html"
+        mode : 0755
+      delegate_to: localhost
+      ignore_errors: true
+      run_once: true
+
+    - name: Pre Patch Kernel Email Notification
+      mail:
+        from: 'IndexInfraMBX@spglobal.com'
+        #to: 'kirubakaran.kannan@spglobal.com'
+        to: 'InfraNotificationMBX@spglobal.com,IndexInfraMBX@spglobal.com'
+        subject: 'SPDJI AWS EC2 {{ ENV }} PATCHING : PRE-PATCH SERVER STATUS on {{ ENV }} {{ REG }}  in {{ AZ }}'
+        subtype: html
+        body: "{{ lookup('file', '{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/prepatch-{{ ENV }}-kernelversion-{{ ansible_date_time.date }}.html') }}"
+        attach: "{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/prepatch-{{ ENV }}-kernelversion-{{ ansible_date_time.date }}.html"
+      delegate_to: localhost
+      run_once: true
+      ignore_errors: true

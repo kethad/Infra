@@ -1,0 +1,20 @@
+---
+  - hosts: all
+    gather_facts: yes
+    become: yes
+    become_user: root
+
+    tasks:
+      - name: check if apache is already installed or not
+        shell: rpm -q httpd | grep -i "httpd-2"
+        ignore_errors: true
+        register: httpd_status
+
+      - include: update-apache.yml
+        vars:
+          ENV: "{{ ENV }}"
+          date: "{{ date }}"
+          currentDate: "{{ currentDate }}"
+          workpath: "{{ workpath }}"      
+        when: httpd_status.rc == 0
+        failed_when: "'FAILED' in httpd_status.stderr"

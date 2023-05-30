@@ -1,0 +1,271 @@
+- hosts: all
+  become: yes
+  become_method: sudo
+  ignore_unreachable: yes
+  tasks:
+    - name: Download and install a copy of the CA Certificate for the foreman server - RH7
+      yum:
+        disable_gpg_check: yes
+        name: http://foreman.infra.spdji.spgi/pub/katello-ca-consumer-latest.noarch.rpm
+        state: present
+      when:
+        - ansible_distribution_major_version == "7"
+      ignore_errors: true
+
+    - name: Download and install a copy of the CA Certificate for the foreman server - RH8
+      dnf:
+        disable_gpg_check: yes
+        name: http://foreman.infra.spdji.spgi/pub/katello-ca-consumer-latest.noarch.rpm
+        state: present
+      when:
+        - ansible_distribution_major_version == "8"
+      ignore_errors: true
+
+    - name: Download and install foreman client - RH7
+      yum:
+        disable_gpg_check: yes
+        name: https://yum.theforeman.org/client/latest/el7/x86_64/foreman-client-release.rpm
+        state: present
+      when:
+        - ansible_distribution_major_version == "7"
+      ignore_errors: true
+
+    - name: Download and install foreman client - RH8
+      dnf:
+        disable_gpg_check: yes
+        name: https://yum.theforeman.org/client/latest/el8/x86_64/foreman-client-release.rpm
+        state: present
+      when:
+        - ansible_distribution_major_version == "8"
+      ignore_errors: true
+
+    - name: Download and install epel-release - RH7
+      yum:
+        disable_gpg_check: yes
+        name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+        state: present
+      when:
+        - ansible_distribution_major_version == "7"
+      ignore_errors: true
+
+    - name: Download and install epel-release - RH8
+      dnf:
+        disable_gpg_check: yes
+        name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+        state: present
+      when:
+        - ansible_distribution_major_version == "8"
+      ignore_errors: true
+
+    - name: Download and install epel-release - RH9
+      dnf:
+        disable_gpg_check: yes
+        name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+        state: present
+      when:
+        - ansible_distribution_major_version == "9"
+      ignore_errors: true
+
+    - name: Installing katello packages - RH7
+      yum:
+        name: ['katello-host-tools', 'katello-agent', 'katello-host-tools-tracer']
+        state: present
+      when:
+        - ansible_distribution_major_version == "7"
+      ignore_errors: true
+
+    - name: Installing katello packages - RH8
+      dnf:
+        name: ['katello-host-tools', 'katello-agent', 'katello-host-tools-tracer']
+        state: present
+#      when:
+#        - ansible_distribution_major_version == "8"
+#      ignore_errors: true
+
+    - name: Get Environment Details of each server
+      shell: "/usr/local/bin/aws ec2 describe-instances --region {{ REGION }} --filters Name=private-ip-address,Values={{ inventory_hostname }} --query 'Reservations[].Instances[].[Tags[?Key==`Environment`].Value]' --output text"
+      delegate_to: localhost
+      remote_user: jenkins
+      register: env
+      ignore_errors: true
+
+    - debug: msg="{{env.stdout}}"
+
+    - name: Registering DEV client into Forman -RH7
+      redhat_subscription:
+        state: present
+        activationkey: RH7-DEV-KEY
+        org_id: SPDJI
+      when:
+        - ansible_distribution_major_version == "7"
+        - env.stdout == "DEV"
+      ignore_errors: true
+
+    - name: Registering QA & UAT client into Forman -RH7
+      redhat_subscription:
+        state: present
+        activationkey: RH7-QA-UAT-KEY
+        org_id: SPDJI
+      when:
+        - ansible_distribution_major_version == "7"
+        - env.stdout == "UAT" or env.stdout == "QA"
+      ignore_errors: true
+
+    - name: Registering PROD client into Forman -RH7
+      redhat_subscription:
+        state: present
+        activationkey: RH7-PROD-KEY
+        org_id: SPDJI
+      when:
+        - ansible_distribution_major_version == "7"
+        - env.stdout == "PROD" or env.stdout == "PREPROD" or env.stdout == "PREPROD2"
+      ignore_errors: true
+
+    - name: Registering DR client into Forman -RH7
+      redhat_subscription:
+        state: present
+        activationkey: RH7-DR-KEY
+        org_id: SPDJI
+      when:
+        - ansible_distribution_major_version == "7"
+        - env.stdout == "DR"
+      ignore_errors: true
+
+    - name: Registering DEV client into Forman -RH8
+      redhat_subscription:
+        state: present
+        activationkey: RH8-DEV-KEY
+        org_id: SPDJI
+      when:
+        - ansible_distribution_major_version == "8"
+        - env.stdout == "DEV" or env.stdout == "DEV1" or env.stdout == "DEV2"
+      ignore_errors: true
+
+    - name: Registering QA & UAT client into Forman -RH8
+      redhat_subscription:
+        state: present
+        activationkey: RH8-QA-UAT-KEY
+        org_id: SPDJI
+      when:
+        - ansible_distribution_major_version == "8"
+        - env.stdout == "QA" or env.stdout == "UAT" or env.stdout == "QA1" or env.stdout == "QA2" or env.stdout == "PRODFIX"
+      ignore_errors: true
+
+    - name: Registering PROD client into Forman -RH8
+      redhat_subscription:
+        state: present
+        activationkey: RH8-PROD-KEY
+        org_id: SPDJI
+      when:
+        - ansible_distribution_major_version == "8"
+        - env.stdout == "PROD" or env.stdout == "PREPROD" or env.stdout == "PREPROD2"
+      ignore_errors: true
+
+    - name: Registering DR client into Forman -RH8
+      redhat_subscription:
+        state: present
+        activationkey: RH8-DR-KEY
+        org_id: SPDJI
+      when:
+        - ansible_distribution_major_version == "8"
+        - env.stdout == "DR"
+      ignore_errors: true
+
+    - name: Registering DEV client into Forman -RH9
+      redhat_subscription:
+        state: present
+        activationkey: RH9-DEV-KEY
+        org_id: SPDJI
+      when:
+        - ansible_distribution_major_version == "9"
+        - env.stdout == "DEV" or env.stdout == "DEV1" or env.stdout == "DEV2"
+      ignore_errors: true
+
+    - name: Registering QA & UAT client into Forman -RH9
+      redhat_subscription:
+        state: present
+        activationkey: RH9-QA-UAT-KEY
+        org_id: SPDJI
+      when:
+        - ansible_distribution_major_version == "9"
+        - env.stdout == "QA" or env.stdout == "UAT" or env.stdout == "QA1" or env.stdout == "QA2" or env.stdout == "PRODFIX"
+      ignore_errors: true
+
+    - name: Registering PROD client into Forman -RH9
+      redhat_subscription:
+        state: present
+        activationkey: RH9-PROD-KEY
+        org_id: SPDJI
+      when:
+        - ansible_distribution_major_version == "9"
+        - env.stdout == "PROD" or env.stdout == "PREPROD" or env.stdout == "PREPROD2"
+      ignore_errors: true
+
+    - name: Registering DR client into Forman -RH9
+      redhat_subscription:
+        state: present
+        activationkey: RH9-DR-KEY
+        org_id: SPDJI
+      when:
+        - ansible_distribution_major_version == "9"
+        - env.stdout == "DR"
+      ignore_errors: true
+
+    - name: yum-clean-metadata
+      command: yum clean metadata
+      args:
+        warn: no
+      ignore_errors: true
+#      when: ansible_distribution_major_version == "8"
+
+    - name: Enable Subscribed repostories
+      command: subscription-manager config --rhsm.manage_repos=1
+      ignore_errors: true
+#      when: ansible_distribution_major_version == "8"      
+      
+    - name: Create back dir
+      file:
+        path: /etc/yum.repos.d/bkp
+        state: directory
+      ignore_errors: true
+ #     when: ansible_distribution_major_version == "8"      
+
+    - name: Take backup of existing dir
+      copy:
+        src: /etc/yum.repos.d/
+        dest: /etc/yum.repos.d/bkp
+        remote_src: yes
+      ignore_errors: true
+ #     when: ansible_distribution_major_version == "8"      
+
+    - name: Locate all existing repos
+      find:
+        paths: /etc/yum.repos.d
+        patterns: "*.repo"
+      register: files_to_delete
+      ignore_errors: true
+ #     when: ansible_distribution_major_version == "8"      
+
+    - name: Remove all local repo
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      with_items: "{{ files_to_delete.files }}"
+      ignore_errors: true
+#      when: ansible_distribution_major_version == "8"     
+      
+    - name: Get Owner Details of each server
+      shell: "/usr/local/bin/aws ec2 describe-instances --region {{ REGION }} --filters Name=private-ip-address,Values={{ inventory_hostname }} --query 'Reservations[].Instances[].[Tags[?Key==`Owner`].Value]' --output text"
+      delegate_to: localhost
+      register: owner
+      ignore_errors: true
+
+    - debug: msg="{{owner.stdout}}"
+
+    - name: Update owner as add-on in foreman
+      shell: subscription-manager addons --add={{owner.stdout}}
+      ignore_errors: true
+      
+    - name: Ensure permissions on repos files are correct
+      shell: chmod 0600 /etc/yum.repos.d/redhat.repo /var/lib/rhsm/cache/written_overrides.json /var/lib/rhsm/repo_server_val/redhat.repo /var/lib/rhsm/cache/current_owner.json
+      ignore_errors: true

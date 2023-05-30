@@ -1,0 +1,206 @@
+---
+  - hosts: all
+    gather_facts: yes
+    throttle: 1
+    become: true
+    become_user: root
+    become_method: sudo
+    ignore_unreachable: yes
+
+    tasks:
+      - name: Katello-Tracer-Upload
+        shell: "/usr/sbin/katello-tracer-upload"
+        ignore_errors: yes
+
+        #      - name: Create an blank file
+        #        lineinfile:
+        #file:
+        #   path: "{{workpath}}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/postpatch-{{ENV}}-kernelversion-{{ ansible_date_time.date }}.csv"
+        #   line: "test"
+        #   create: yes
+        #   owner: jenkins
+        #   group: jenkins
+        #delegate_to: localhost
+        #run_once: true
+        #ignore_errors: yes
+
+
+        #      - name: Create an blank file
+        #        shell: echo -e "first\nlast" > "{{workpath}}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/postpatch-{{ENV}}-kernelversion-{{ ansible_date_time.date }}.csv"
+        #        delegate_to: localhost
+        #        run_once: true
+        #        ignore_errors: yes
+
+      - name: Make sure wget package is installed
+        dnf:
+          name: wget
+          state: latest
+
+      - name: Deploy the script to check the status
+        get_url:
+           url: http://foreman.infra.spdji.spgi/pub/patching/patching_check.sh
+           dest: /root/
+           mode: 0755
+
+      - name: Run Patching Script
+        block:
+           - command: ./patching_check.sh
+             args:
+               chdir: /root/
+             register: patching_status
+           - debug: var=patching_status.stdout_lines
+
+      - name: Get old kernel
+        shell: rpm -q --last kernel | head -2 | tail -1 | awk '{print $1}' | sed 's/kernel-//'
+        register: previous_kernel
+
+      - name: Get Instance ID
+        shell: |
+           /usr/local/bin/aws ec2 describe-instances --region {{ REGION }} --filter Name=private-ip-address,Values="{{ inventory_hostname }}" --query 'Reservations[].Instances[].InstanceId' --output text
+        register: instance_id
+        ignore_errors: true
+
+        #      - debug:
+        #          msg: "{{ instance_id.stdout }}"
+        #        ignore_errors: true
+
+      - name: Get Instance Name
+        shell: |
+           /usr/local/bin/aws ec2 describe-tags --region {{ REGION }} --filters "Name=resource-id,Values={{instance_id.stdout}}" "Name=key,Values=Name" --output text | cut -f5;
+        register: instance_name
+        ignore_errors: true
+        when: instance_id.stdout != ''
+
+      - name: Get Instance AZ
+        shell: |
+           /usr/local/bin/aws ec2 describe-tags --region {{ REGION }} --filters "Name=resource-id,Values={{instance_id.stdout}}" "Name=key,Values=AZ" --output text | cut -f5;
+        register: instance_az
+        ignore_errors: true
+
+      - name: Get Owner Details
+        shell: |
+          /usr/local/bin/aws ec2 describe-tags --region {{ REGION }} --filters "Name=resource-id,Values={{instance_id.stdout}}" "Name=key,Values=Owner" --output text | cut -f5;
+        register: instance_owner
+        ignore_errors: true
+        when: instance_id.stdout != ''
+
+
+        #      - debug:
+        #          msg: "{{ instance_name.stdout }}"
+        #        when: instance_id.stdout != ''
+        #        ignore_errors: true
+
+      - name: adding value to csv
+        lineinfile:
+                #           insertafter: "BOF"
+           dest: "{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/postpatch-{{ENV}}-kernelversion-{{ ansible_date_time.date }}.csv"
+           line: "{{ ansible_default_ipv4.address }} {{ instance_name.stdout }} {{ instance_owner.stdout }} {{ REG }} {{ instance_az.stdout|upper }} {{ previous_kernel.stdout }} {{ ansible_kernel }} {{ patching_status.stdout }}"
+           create: yes
+           owner: jenkins
+           group: jenkins
+           mode: 0755
+        delegate_to: localhost
+        ignore_errors: true
+        register: csv_update
+
+      - name: debug of csv update
+        debug:
+          msg: "{{ csv_update }}"
+
+          #- name: Delete first line
+          #lineinfile:
+          #   dest: "{{workpath}}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/postpatch-{{ENV}}-kernelversion-{{ ansible_date_time.date }}.csv"
+          #   regexp: "^first"
+          #   state: absent
+          #delegate_to: localhost
+          #run_once: true
+          #ignore_errors: true
+
+          #- name: Delete last line
+          #lineinfile:
+          #   dest: "{{workpath}}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/postpatch-{{ENV}}-kernelversion-{{ ansible_date_time.date }}.csv"
+             #   regexp: "^last"
+             #   state: absent
+             #delegate_to: localhost
+             #run_once: true
+             #ignore_errors: true
+
+      - name: Convert output into HTML report
+        shell: "{{ workpath }}/csv-to-html.sh < {{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/postpatch-{{ ENV }}-kernelversion-{{ ansible_date_time.date }}.csv > {{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/postpatch-{{ ENV }}-kernelversion-{{ ansible_date_time.date }}.html"
+        run_once: true
+        delegate_to: localhost
+
+      - name: Change file permissions
+        file:
+          path: "{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/postpatch-{{ ENV }}-kernelversion-{{ ansible_date_time.date }}.html"
+          mode : 0755
+        delegate_to: localhost
+        ignore_errors: true
+        run_once: true
+
+      - name: Remove patching_check.sh file
+        file:
+          path: /root/patching_check.sh
+          state: absent
+
+      - name: Email RHEL Post Patch Status
+        block:
+          - mail:
+              host: mail.spglobal.com
+              port: 25
+              from: 'IndexInfraMBX@spglobal.com'
+#            to: 'InfraNotificationMBX@spglobal.com,IndexInfraMBX@spglobal.com'
+              to: 'kailash.kumawat@spglobal.com,IndexInfraMBX@spglobal.com,InfraNotificationMBX@spglobal.com'
+              #to: 'kailash.kumawat@spglobal.com'
+              #              subject: 'SPDJI AWS {{ ENV }} EC2 PATCHING : POST-PATCH SERVER STATUS on {{ ENV }} {{ REG }} for {{ APPLICATION }} {{ SERVER_TYPE }}'
+              subject: 'SPDJI AWS {{ ENV }} {{ REG }} RHEL PATCHING Status - Build Number {{ buildNumber }}'
+              subtype: html
+              body:  "{{ lookup ('file', '{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/postpatch-{{ ENV }}-kernelversion-{{ ansible_date_time.date }}.html') }}"
+              attach: "{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/postpatch-{{ ENV }}-kernelversion-{{ ansible_date_time.date }}.html"
+        delegate_to: localhost
+        run_once: true
+        ignore_errors: true
+
+      - name: Check Apache Tomcat log file status
+        stat:
+           path: "{{ workpath }}/convert_apache.sh < {{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/apache-tomcat-status-{{ ENV }}-{{ ansible_date_time.date }}.log"
+        register: apache_tomcat
+        delegate_to: localhost
+
+      - name: Convert Apache/Tomcat status log file to HTML File
+        shell: "{{ workpath }}/convert_apache.sh < {{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/apache-tomcat-status-{{ ENV }}-{{ ansible_date_time.date }}.log > {{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/apache-tomcat-status-{{ ENV }}-{{ ansible_date_time.date }}.html"
+        delegate_to: localhost
+        ignore_errors: yes
+        when: apache_tomcat.stat.exists == "true"
+
+      - name: Change Apache/Tomcat html file permissions
+        file:
+          path: "{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/apache-tomcat-status-{{ ENV }}-{{ ansible_date_time.date }}.html"
+          mode : 0755
+        delegate_to: localhost
+        ignore_errors: true
+        run_once: true
+        when: apache_tomcat.stat.exists == "true"
+
+      - name: Change file permissions
+        file:
+          path: "{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/apache-tomcat-status-{{ ENV }}-{{ ansible_date_time.date }}.html"
+          mode : 0755
+        delegate_to: localhost
+        ignore_errors: true
+        run_once: true
+        when: apache_tomcat.stat.exists == "true"
+
+      - name: Post Patch Apache/Tomcat Status Email Notification
+        mail:
+          from: 'IndexInfraMBX@spglobal.com'
+          #to: 'kailash.kumawat@spglobal.com'
+          to: 'InfraNotificationMBX@spglobal.com,IndexInfraMBX@spglobal.com,kailash.kumawat@spglobal.com'
+          subject: 'SPDJI AWS {{ ENV }} EC2 PATCHING : APACHE/TOMCAT UPGRADE STATUS on {{ ENV }} {{ REG }} for {{ APPLICATION }} Application'
+          subtype: html
+          body: "{{ lookup('file', '{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/apache-tomcat-status-{{ ENV }}-{{ ansible_date_time.date }}.html') }}"
+          attach: "{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/apache-tomcat-status-{{ ENV }}-{{ ansible_date_time.date }}.html"
+        delegate_to: localhost
+        run_once: true
+        ignore_errors: true
+        when: apache_tomcat.stat.exists == "true"

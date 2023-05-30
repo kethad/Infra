@@ -1,0 +1,20 @@
+---
+  - hosts: all
+    gather_facts: yes
+    become: true
+    become_user: root
+    become_method: sudo
+
+    vars:
+      - date: "{{ ansible_date_time }}"
+
+    tasks:
+      - name: Check if datadog agent has update 
+        shell: stat /opt/datadog-agent/ | grep -i "Modify" | awk -F" " '{ print $2 }'
+        register: datadog_update
+
+      - debug: msg="{{datadog_update}}"
+
+      - name: Perform Datadog Checks
+        shell: chmod 750 /opt/datadog-agent/; systemctl stop datadog-agent; systemctl disable datadog-agent
+        when: "{{ datadog_update.stdout }} == {{ ansible_date_time.date}}"

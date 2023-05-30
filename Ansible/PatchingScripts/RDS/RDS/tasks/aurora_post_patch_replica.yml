@@ -1,0 +1,76 @@
+---
+      - name: Identify Replica cluster identifier
+        shell: "/usr/local/bin/aws rds describe-db-clusters --region {{ REPLICA_REGION }} --db-cluster-identifier {{ CLUSTER_NAME }} --query DBClusters[].DBClusterMembers[].DBInstanceIdentifier --output text"
+        register: replicaIds
+        ignore_errors: yes
+
+      - name: DB Instance Identifiers
+        debug:
+          msg: "{{ replicaIds.stdout.split('\t')[0] }}"
+        register: replicaInstID
+        when: replicaIds.stdout | length > 0
+
+      - name: Wait for the instance to become available
+        shell: "/usr/local/bin/aws rds wait --region {{ REPLICA_REGION }} db-instance-available --db-instance-identifier {{ replicaInstID.msg }}"
+        register: wait_for_available
+
+      - name: Debug wait for available
+        debug:
+          msg: "{{ wait_for_available }}"
+
+      - name: Get the DB Instance Status
+        shell: "/usr/local/bin/aws rds describe-db-instances --region {{ REPLICA_REGION }} --db-instance-identifier {{ replicaInstID.msg }} --query DBInstances[].DBInstanceStatus --output text"
+        register: replica_status
+        until: replica_status.stdout != 'upgrading'
+        retries: 60
+        delay: 10
+        when: wait_for_available.rc == 0
+        ignore_errors: yes
+
+      - name: Debug DB Instance Status
+        debug:
+          msg: "{{ replica_status.stdout }}"
+
+      - name: Get the Engine Version of the instance
+        shell: "/usr/local/bin/aws rds describe-db-clusters --region {{ REPLICA_REGION }} --db-cluster-identifier {{ CLUSTER_NAME }} --query DBClusters[].EngineVersion --output text"
+        register: replica_engine_version
+        ignore_errors: yes
+        #when: replica_status.stdout == "available"
+        failed_when: "'FAILED' in replica_status.stderr"
+
+      - name: Engine Version Result
+        debug:
+          msg: "{{ replica_engine_version.stdout }}"
+
+      - set_fact:
+          ENGINE_VERSION: "{{ replica_engine_version.stdout }}"
+
+      - name: Print Result of Replica Cluster Patching
+        debug:
+          msg: "Patching has been completed for Replica Cluster with the version {{ AVAILABLE_VERSION }}"
+        when: AVAILABLE_VERSION == ENGINE_VERSION
+
+      - name: Print Results of Replica Cluster Patching
+        debug:
+          msg: "Patching is unsuccesfull for Replica Cluster as {{ AVAILABLE_VERSION }} is not matched with {{ ENGINE_VERSION }}"
+        when: AVAILABLE_VERSION != ENGINE_VERSION
+
+      - mail:
+          from: IndexInfraMBX@spglobal.com
+          #to: kirubakaran.kannan@spglobal.com
+          to: 'InfraNotificationMBX@spglobal.com,IndexInfraMBX@spglobal.com'
+          subject: 'SPDJI AWS RDS PATCHING JOB UPDATE:  For {{ CLUSTER_NAME }} in {{ JOB_NAME }} Build Number {{ BUILD_NUMBER }}'
+          body: 'Minor Version Upgrade is completed for {{ CLUSTER_NAME }} Cluster with {{ AVAILABLE_VERSION }} Engine Version. For more details, Check console output at {{ BUILD_URL }}'
+        when:
+          - UPGRADE_TYPE == 'MinorVersion'
+          - AVAILABLE_VERSION == ENGINE_VERSION
+
+      - mail:
+          from: IndexInfraMBX@spglobal.com
+          #to: kirubakaran.kannan@spglobal.com
+          to: 'InfraNotificationMBX@spglobal.com,IndexInfraMBX@spglobal.com'
+          subject: 'SPDJI AWS RDS PATCHING JOB UPDATE:  For {{ CLUSTER_NAME }} in {{ JOB_NAME }} Build Number {{ BUILD_NUMBER }}'
+          body: 'Minor Version Upgrade is unsuccessfull for {{ CLUSTER_NAME }} Cluster with {{ AVAILABLE_VERSION }} is not matched with {{ ENGINE_VERSION }} Engine Version. For more details, Check console output at {{ BUILD_URL }}'
+        when:
+          - UPGRADE_TYPE == 'MinorVersion'
+          - AVAILABLE_VERSION != ENGINE_VERSION

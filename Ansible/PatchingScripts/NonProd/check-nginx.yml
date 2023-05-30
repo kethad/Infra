@@ -1,0 +1,21 @@
+---
+  - hosts: all
+    ignore_unreachable: yes
+    gather_facts: yes
+    become: yes
+    become_user: root
+
+    tasks:
+      - name: check if nginx is already installed or not
+        shell: rpm -q nginx
+        ignore_errors: true
+        register: nginx_status
+
+      - include: update-nginx.yml
+        vars:
+          ENV: "{{ ENV }}"
+          date: "{{ date }}"
+          currentDate: "{{ currentDate }}"
+          workpath: "{{ workpath }}"      
+        when: nginx_status.rc == 0
+        failed_when: "'FAILED' in nginx_status.stderr"

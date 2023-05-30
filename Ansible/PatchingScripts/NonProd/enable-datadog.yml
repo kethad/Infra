@@ -1,0 +1,20 @@
+---
+  - hosts: all
+    become: true
+    tasks:
+      - name: Checking the datadog service is enabled or not
+        shell: systemctl is-enabled datadog-agent
+        register: datadog_enable
+        ignore_errors: yes
+
+      - name: Checking the datadog service is active or not
+        shell: systemctl is-active datadog-agent
+        # register: datadog_enable
+        ignore_errors: yes
+
+      - name: Enabling and Starting the service
+        systemd:
+          enabled: yes
+          state: restarted
+          daemon_reload: yes
+          name: datadog-agent

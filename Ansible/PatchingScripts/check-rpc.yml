@@ -1,0 +1,25 @@
+---
+- hosts: all
+  gather_facts: yes
+  become: yes
+  become_user: root
+
+  tasks:
+    - name: Check if nodev option is set for rpc_pipefs
+      lineinfile:
+        path: /usr/lib/systemd/system/var-lib-nfs-rpc_pipefs.mount
+        regexp: '^Options=nodev'
+        state: absent
+      check_mode: yes
+      changed_when: false
+      register: rpc_status
+
+    - include: rpc_pipefs.yml
+      when: not rpc_status.found
+
+  handlers:
+    - name: reload pipefs
+      systemd:
+        name: var-lib-nfs-rpc_pipefs.mount
+        daemon_reload: yes
+        state: restarted

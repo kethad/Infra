@@ -1,0 +1,76 @@
+---
+      - name: Identify Primary cluster identifier
+        shell: "/usr/local/bin/aws rds describe-db-clusters --region {{ SOURCE_REGION }} --db-cluster-identifier {{ PRIMARY_CLUSTER.msg }} --query DBClusters[].DBClusterMembers[].DBInstanceIdentifier --output text"
+        register: primary_db_id
+        ignore_errors: yes
+
+      - name: DB Instance Identifiers
+        debug:
+          msg: "{{ primary_db_id.stdout.split('\t')[0] }}"
+        register: primaryInstID
+        when: primary_db_id.stdout | length > 0
+
+      - name: Wait for Primary Cluster to Available
+        shell: "/usr/local/bin/aws rds wait --region {{ SOURCE_REGION }} db-instance-available --db-instance-identifier {{ primaryInstID.msg }}"
+        register: wait_for_available
+
+      - name: Debug wait for available
+        debug:
+          msg: "{{ wait_for_available }}"
+
+      - name: Get the DB Instance Status
+        shell: "/usr/local/bin/aws rds describe-db-instances --region {{ SOURCE_REGION }} --db-instance-identifier {{ primaryInstID.msg }} --query DBInstances[].DBInstanceStatus --output text"
+        register: primary_status
+        until: replica_status.stdout != 'upgrading'
+        retries: 60
+        delay: 10        
+        when: wait_for_available.rc == 0
+        ignore_errors: yes
+
+      - name: Debug DB Instance Status
+        debug:
+          msg: "{{ primary_status.stdout }}"
+
+      - name: Get the Engine Version of the instance
+        shell: "/usr/local/bin/aws rds describe-db-clusters --region {{ SOURCE_REGION }} --db-cluster-identifier {{ PRIMARY_CLUSTER.msg }} --query DBClusters[].EngineVersion --output text"
+        register: primary_engine_version
+        ignore_errors: yes
+        #when: primary_status.stdout == "available"
+        failed_when: "'FAILED' in primary_status.stderr"
+
+      - name: Engine Version Result
+        debug:
+          msg: "{{ primary_engine_version.stdout }}"
+
+      - set_fact:
+          ENGINE_VERSION: "{{ primary_engine_version.stdout }}"
+
+      - name: Print Result of Primary Cluster Patching
+        debug:
+          msg: "Patching has been completed for Replica Cluster with the version {{ AVAILABLE_VERSION }}"
+        when: AVAILABLE_VERSION  == ENGINE_VERSION
+
+      - name: Print Results of Primary Cluster Patching
+        debug:
+          msg: "Patching is unsuccesfull for Replica Cluster as {{ AVAILABLE_VERSION }} is not matched with {{ ENGINE_VERSION }}"
+        when: AVAILABLE_VERSION != ENGINE_VERSION
+
+      - mail:
+          from: IndexInfraMBX@spglobal.com
+          #to: kirubakaran.kannan@spglobal.com
+          to: 'InfraNotificationMBX@spglobal.com,IndexInfraMBX@spglobal.com'
+          subject: 'SPDJI AWS RDS PATCHING JOB UPDATE:  For {{ CLUSTER_NAME }} in {{ JOB_NAME }} Build Number {{ BUILD_NUMBER }}'
+          body: 'Minor Version Upgrade is completed for primary cluster {{ CLUSTER_NAME }} Cluster with {{ AVAILABLE_VERSION }} Engine Version. For more details, Check console output at {{ BUILD_URL }}'
+        when:
+          - UPGRADE_TYPE == 'MinorVersion'
+          - AVAILABLE_VERSION == ENGINE_VERSION
+
+      - mail:
+          from: IndexInfraMBX@spglobal.com
+          #to: kirubakaran.kannan@spglobal.com
+          to: 'InfraNotificationMBX@spglobal.com,IndexInfraMBX@spglobal.com'
+          subject: 'SPDJI AWS RDS PATCHING JOB UPDATE:  For {{ CLUSTER_NAME }} in {{ JOB_NAME }} Build Number {{ BUILD_NUMBER }}'
+          body: 'Minor Version Upgrade is unsuccessfull for primary cluster {{ CLUSTER_NAME }} Cluster with {{ AVAILABLE_VERSION }} is not matched with {{ ENGINE_VERSION }} Engine Version. For more details, Check console output at {{ BUILD_URL }}'
+        when:
+          - UPGRADE_TYPE == 'MinorVersion'
+          - AVAILABLE_VERSION != ENGINE_VERSION

@@ -1,0 +1,170 @@
+---
+    - name: clean metadata - RH7
+      shell: yum clean metadata
+      when: ansible_distribution_release|string == 'Maipo'
+      
+    #### Install APR
+    ####- name: Install the latest APR - RH7
+    ####  yum: name=apr enablerepo=SPDJI_mhfi_prod_repo_APP disablerepo=* state=latest
+    ####  when: ansible_distribution_release|string == 'Maipo'
+
+    ####- name: Install the latest APR-UTIL - RH7
+    ####  yum: name=apr-util enablerepo=SPDJI_mhfi_prod_repo_APP disablerepo=* state=latest
+    ####  when: ansible_distribution_release|string == 'Maipo'
+
+    ####- name: Install the latest pcre - RH7
+    ####  yum: name=pcre state=latest enablerepo=SPDJI_mhfi_prod_repo_APP disablerepo=*
+    ####  when: ansible_distribution_release|string == 'Maipo'
+
+    ####- name: Install the latest distcache - RH7
+    ####  yum: name=distcache enablerepo=SPDJI_mhfi_prod_repo_APP disablerepo=* state=latest
+    ####  when: ansible_distribution_release|string == 'Maipo'
+
+    ####- name: Install the latest distcache-devel - RH7
+    ####  yum: name=distcache-devel enablerepo=SPDJI_mhfi_prod_repo_APP disablerepo=* state=latest
+    ####  when: ansible_distribution_release|string == 'Maipo'
+
+    - name: clean metadata - RH8
+      command: dnf clean metadata
+      when: ansible_distribution_release|string == 'Ootpa'
+
+    - name: Install latest httpd -RH7
+      yum: name=httpd enablerepo=SPDJI_mhfi_prod_repo_APP disablerepo=* state=latest
+      when: ansible_distribution_release|string == 'Maipo'
+
+    - name: Install the latest httpd-tools - RH7
+      #yum: name=httpd-tools enablerepo=mhfi_dev_repo_APP disablerepo=epel*,rhel* state=latest
+      yum: name=httpd-tools enablerepo=SPDJI_mhfi_prod_repo_APP disablerepo=* state=latest
+      when: ansible_distribution_release|string == 'Maipo'
+
+    - name: Installing the mod_ssl - RH7
+      #yum: name=mod_ssl enablerepo=mhfi_dev_repo_APP disablerepo=epel,rhel*,redhat* state=latest
+      yum: name=mod_ssl enablerepo=SPDJI_mhfi_prod_repo_APP disablerepo=* state=latest
+      when: ansible_distribution_release|string == 'Maipo'
+
+    - name: Installing the latest SPGlobal extra files - RH7
+      #yum: name=SPG_Extra enablerepo=mhfi_dev_repo_APP disablerepo=epel,rhel*,redhat* state=latest
+      yum: name=SPG_Extra enablerepo=SPDJI_mhfi_prod_repo_APP disablerepo=* state=latest
+      when: ansible_distribution_release|string == 'Maipo'
+
+    - name: Installing the  mod_authnz_ldap - RH7
+      #yum: name=mod_authnz_ldap enablerepo=mhfi_dev_repo_APP disablerepo=epel,rhel*,redhat* state=latest
+      yum: name=mod_authnz_ldap enablerepo=SPDJI_mhfi_prod_repo_APP disablerepo=* state=latest
+      when: ansible_distribution_release|string == 'Maipo'
+
+    - name: Installing httpd packages for RHEL8
+      dnf:
+      ###  name: ['apr', 'apr-util', 'mod_ssl', 'mod_authnz_ldap']
+        name: ['mod_ssl', 'mod_authnz_ldap']
+        enablerepo: SPDJI_mhfi_prod_repo_Apache
+        disablerepo: "*"
+        state: latest
+      when: ansible_distribution_release|string == 'Maipo'
+      
+    - name: Installing httpd packages for RHEL8
+      dnf:
+        name: ['httpd', 'httpd-tools', 'mod_ssl', 'mod_authnz_ldap']
+        enablerepo: SPDJI_mhfi_prod_repo_Apache
+        disablerepo: "*"
+        state: latest
+      when: ansible_distribution_release|string == 'Ootpa'
+
+     #### make local user directories
+
+    - name: Create local_apps perms
+      file:
+        path: /local/apps
+        state: directory
+        mode: 0755
+
+    - name: remove exisitng sym link to httpd
+      file:
+        path: /local/apps/apache/httpd-2.4
+        state: absent
+
+    - name: get latet installed apache location
+      shell: ls -d `rpm -qa |grep httpd |egrep -v "tools|devel" |awk -F "-" '{print $1"-"$2}'` 2>/dev/null
+      args:
+        chdir: /local/apps/apache/
+      register: httpd_rpm
+      ignore_errors: yes
+
+    - name: Create apache symlink
+      file:
+        src="/local/apps/apache/{{ httpd_rpm.stdout }}"
+        dest="/local/apps/apache/httpd-2.4"
+        state=link
+        force=yes
+
+    - name: Create run
+      file:
+        path: /local/apps/apache/httpd-2.4/run
+        state: directory
+        mode: 0755
+
+    - name: Create libpcre symlinks
+      file:
+        src="/usr/lib64/libpcre.so.1"
+        dest="/lib64/libpcre.so.0"
+        state=link
+        force=yes
+        owner=root
+        group=root
+
+    - name: Create libdb symlinks
+      file:
+        src="/usr/lib64/libdb-5.3.so"
+        dest="/usr/lib64/libdb-4.7.so"
+        state=link
+        force=yes
+        owner=root
+        group=root
+
+    - name: Change the owner of apache app dir
+      file: dest=/local/apps/apache/ owner=apache group=apache recurse=yes
+      ignore_errors: yes
+
+    - name: update permission of mh-extra
+      shell: chmod -R 755 /local/apps/apache/mh-extra
+      ignore_errors: yes     ##remove it later its for temporarly
+
+    - name: "wget mod_wsgi"
+      get_url:
+        url: https://artifactory-use-prod.cicd.spglobal.com/artifactory/pe-build-middleware-Prod/apache/rhel7/mod_wsgi.so
+        dest: /local/apps/apache/httpd-2.4/modules
+        mode: '0755'
+
+    - name: "insert mod_wsgi into httpd.conf"
+      shell: sed -i '70i  LoadModule wsgi_module modules/mod_wsgi.so' /local/apps/apache/httpd-2.4/httpd/conf/httpd.conf
+
+    - name: Clean up rpm files
+      shell: rm -f httpd*.rpm
+      args:
+        chdir: /local/apps
+
+    - name: Check the new version of apache
+      shell: rpm -q httpd | grep -i "httpd-2"
+      ignore_errors: true
+      register: httpd_new_status
+
+    - debug: var=httpd_new_status.stdout
+
+    - name: Get Apache update status
+      shell: |
+        hostname -i
+        old_version={{ httpd_status.stdout }};
+        new_version={{ httpd_new_status.stdout }};
+        echo $old_version $new_version;
+        if [[ $old_version != $new_version ]]; then echo "Apache-Upgraded-successfully";
+        else echo "Apache-Not-Upgraded"; fi
+      ignore_errors: true
+      register: apache_upgrade_status
+
+    - name: Update Apache status to a file
+      lineinfile:
+        state: present
+        insertafter: EOF
+        path: "{{ workpath }}/{{ date }}/apache-tomcat-status-{{ ENV }}-{{ currentDate }}.log"
+        line: "{{ apache_upgrade_status.stdout | replace('\n', ' ') | replace('\"', '') }}"
+      delegate_to: localhost
+

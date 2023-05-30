@@ -1,0 +1,35 @@
+---
+- hosts: localhost
+  #become: true
+  tasks:
+    - name: Execute Python Script to create file with Unreachable Hosts List
+      shell: /home/jenkins/unreachable_ips.py "{{ ENV }}" "{{ REGION }}" "{{ BUILD_NUMBER }}"
+      delegate_to: jenkins.or.prod.infra.spdji.spgi
+      remote_user: jenkins
+      become: true
+      ignore_errors: yes
+
+    - name: Check if file exists
+      stat:
+        path: '/local/apps/{{ ENV }}-{{ REGION }}-{{ BUILD_NUMBER }}-unreachable-hosts'
+      delegate_to: jenkins.or.prod.infra.spdji.spgi
+      become: true
+      remote_user: jenkins
+      register: result
+      ignore_errors: yes
+
+    - name: Make sure file is owned by Jenkins user
+      file:
+         path: '/local/apps/{{ ENV }}-{{ REGION }}-{{ BUILD_NUMBER }}-unreachable-hosts'
+         mode: 0664
+         owner: jenkins
+      become: true
+      delegate_to: jenkins.or.prod.infra.spdji.spgi
+      ignore_errors: yes
+
+    - name: copy /home/jenkins/{{ ENV }}-{{ REGION }}-{{ BUILD_NUMBER }}-unreachable-hosts file to Jenkins Slave
+      shell: scp "/local/apps/{{ ENV }}-{{ REGION }}-{{ BUILD_NUMBER }}-unreachable-hosts" jenkins@jenkins-slave.or.prod.infra.spdji.spgi:/home/jenkins/
+      delegate_to: jenkins.or.prod.infra.spdji.spgi
+      remote_user: jenkins
+      when: result.stat.exists
+      ignore_errors: yes

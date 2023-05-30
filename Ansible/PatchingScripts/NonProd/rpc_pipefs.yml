@@ -1,0 +1,36 @@
+---
+    - name: Removing dracut-config-generic package
+      yum:
+        name: dracut-config-generic
+        state: absent
+      when: ansible_distribution == "RedHat" and ansible_distribution_major_version == "7"
+
+    - name: Removing dracut-config-generic package
+      dnf:
+        name: dracut-config-generic
+        state: absent
+      when: ansible_distribution == "RedHat" and ansible_distribution_major_version == "8"
+      
+    - name: Backing up var-lib-nfs-rpc_pipefs.mount file
+      copy:
+        src: /usr/lib/systemd/system/var-lib-nfs-rpc_pipefs.mount
+        dest: /var/tmp
+
+    - name: Adding nodev option
+      lineinfile:
+        state: present
+        path: /usr/lib/systemd/system/var-lib-nfs-rpc_pipefs.mount
+        line: Options=nodev
+        backup: yes
+      notify:
+      - reload pipefs
+      
+    - name: Make sure 755 permissons on /usr/local/lib/python3.6/site-packages      ###temporary test entry will be removed soon
+      file:
+        path: /usr/local/lib/python3.6/site-packages
+        owner: root
+        group: root
+        mode: 0755
+        recurse: yes
+        state: directory
+      ignore_errors: yes

@@ -1,0 +1,76 @@
+---
+- hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Make sure Make sure /home/jenkins/{{ ENV }}-{{ REGION }}-{{ BUILD_NUMBER }}-unreachable-hosts.html file is not present
+      file:
+         path: "/home/jenkins/{{ ENV }}-{{ REGION }}-{{ BUILD_NUMBER }}-unreachable-hosts.html"
+         state: absent
+      delegate_to: localhost
+      become: true
+      become_user: root
+      ignore_errors: yes
+
+    - name: Write Instance Name into file
+      shell: |
+          INSTANCE_ID=$(/usr/local/bin/aws ec2 describe-instances --region "{{ REG }}"  --filter Name=private-ip-address,Values="{{ inventory_hostname }}" --query 'Reservations[].Instances[].InstanceId' --output text);
+          INSTANCE_NAME=$(/usr/local/bin/aws ec2 describe-tags --region "{{ REG }}"  --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=Name" --output text | cut -f5);
+          echo "{{ inventory_hostname }}   :   $INSTANCE_NAME " >> /home/jenkins/{{ ENV }}-{{ REGION }}-{{ BUILD_NUMBER }}-unreachable-hosts.html
+      delegate_to: localhost
+      ignore_errors: yes
+
+- hosts: localhost
+  become: true
+  tasks:
+
+    - name: Check if file exists
+      stat:
+        path: '/home/jenkins/{{ ENV }}-{{ REGION }}-{{ BUILD_NUMBER }}-unreachable-hosts.html'
+      delegate_to: localhost
+      register: result
+      ignore_errors: yes
+
+    - debug:
+        msg: "{{ result }}"
+      delegate_to: localhost
+      when: result.stat.exists
+      ignore_errors: yes
+
+    - name: set permissions
+      shell: chown jenkins:jenkins "/home/jenkins/{{ ENV }}-{{ REGION }}-{{ BUILD_NUMBER }}-unreachable-hosts.html"
+      delegate_to: localhost
+      when: result.stat.exists
+      ignore_errors: yes
+
+    - name: "Mail Unreachable hosts list for {{ ENV }} {{ REGION }} {{ BUILD_NUMBER }} Build"
+      community.general.mail:
+        from: 'IndexInfraMBX@spglobal.com'
+        to: 'indexinfrastructure@spglobal.com'
+        subject: 'SPDJI AWS EC2 PATCHING - Unreachable Hosts Details for {{ ENV }} {{ REGION }} {{ BUILD_NUMBER }}'
+        subtype: plain
+        body: "{{ lookup('file', '/home/jenkins/{{ ENV }}-{{ REGION }}-{{ BUILD_NUMBER }}-unreachable-hosts.html') }}"
+        attach: '/home/jenkins/{{ ENV }}-{{ REGION }}-{{ BUILD_NUMBER }}-unreachable-hosts.html'
+      delegate_to: localhost
+      when: result.stat.exists
+      ignore_errors: yes
+      
+    - name: Make sure /home/jenkins/{{ ENV }}-{{ REGION }}-{{ BUILD_NUMBER }}-unreachable-hosts.html file is deleted
+      file:
+         path: "/home/jenkins/{{ ENV }}-{{ REGION }}-{{ BUILD_NUMBER }}-unreachable-hosts.html"
+         state: absent
+      delegate_to: localhost
+      become: true
+      become_user: root
+      when: result.stat.exists
+      ignore_errors: yes
+      
+    - name: Make sure /home/jenkins/{{ ENV }}-{{ REGION }}-{{ BUILD_NUMBER }}-unreachable-hosts file is deleted
+      file:
+         path: "/home/jenkins/{{ ENV }}-{{ REGION }}-{{ BUILD_NUMBER }}-unreachable-hosts"
+         state: absent
+      delegate_to: localhost
+      become: true
+      become_user: root
+      when: result.stat.exists
+      ignore_errors: yes

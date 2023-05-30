@@ -1,0 +1,19 @@
+---
+    - name: upgrade nginx
+      dnf: name=nginx enablerepo=SPDJI_RHEL8_Nginx_mainline_repo,SPDJI_RHEL8_Nginx_stable_repo disablerepo=* state=latest
+
+    - name: create nginx folder and set permissions
+      file:
+        path: /var/cache/nginx
+        state: directory
+        mode: 0755
+        owner: nginx
+        group: nginx
+        recurse: yes
+
+    - name: Starting and Enabling the nginx service
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
+      ignore_errors: yes

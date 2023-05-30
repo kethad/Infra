@@ -1,0 +1,28 @@
+---
+  - hosts: all
+    ignore_unreachable: yes
+    gather_facts: yes
+    become: yes
+    become_user: root
+
+    tasks:
+      - name: check if apache is already installed or not
+        shell: rpm -q httpd | grep -i "httpd-2"
+        ignore_errors: true
+        register: httpd_status
+
+      - name: check if Apache has available update
+        shell: dnf list available httpd --disablerepo=* --enablerepo=SPDJI_mhfi_prod_repo_Apache
+        ignore_errors: true
+        register: httpd_available_status
+
+      - include: update-apache.yml
+        vars:
+          ENV: "{{ ENV }}"
+          date: "{{ date }}"
+          currentDate: "{{ currentDate }}"
+          workpath: "{{ workpath }}"      
+        when: httpd_status.rc == 0 and httpd_available_status.rc == 0
+        failed_when: 
+          - "'FAILED' in httpd_status.stderr"
+          - "httpd_avaialble_status.rc == 1"

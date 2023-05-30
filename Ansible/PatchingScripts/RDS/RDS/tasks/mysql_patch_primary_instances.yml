@@ -1,0 +1,56 @@
+---
+      - name: Identify Replication Source Identfier of the Seconday Cluster
+        shell: "/usr/local/bin/aws rds describe-db-instances --region {{ REPLICA_REGION }} --db-instance-identifier {{ CLUSTER_NAME }} --query DBInstances[].ReadReplicaSourceDBInstanceIdentifier --output text"
+        register: replica_source_id
+        ignore_errors: yes
+
+      - debug:
+          msg: "{{ replica_source_id.stdout.split(':')[6] }}"
+        register: PRIMARY_INSTANCE
+
+      - name: Get Region of the Cluster
+        shell: "/usr/local/bin/aws rds describe-db-instances --region {{ item }} --db-instance-identifier {{ PRIMARY_INSTANCE.msg }} --query 'DBInstances[*].{Name:TagList[?Key==`Region`]|[0].Value}' --output text"
+        register: REG
+        ignore_errors: yes
+        with_items: "{{ REGION }}"
+
+      - debug:
+          msg: "{{ REG.results | map(attribute='stdout_lines') | select() | list }}"
+
+      - set_fact:
+          SOURCE_REGION: "{{ REG.results | map(attribute='stdout_lines') | select() | list| replace('[','') | replace(']','') }}"
+
+      - name: Perform Patching on Primary Instance
+        shell: "/usr/local/bin/aws rds modify-db-instance --region {{ SOURCE_REGION }} --db-instance-identifier {{ PRIMARY_INSTANCE.msg }} --engine-version {{ AVAILABLE_VERSION }} --apply-immediately"
+        register: primaryPatchInit
+
+      - debug:
+          msg: "{{ primaryPatchInit.stdout }}"
+
+      - name: Pause for 60 seconds
+        pause:
+          seconds: 60
+
+      - name: Fetch Primary Cluster Status
+        shell: "/usr/local/bin/aws rds describe-db-instances --region {{ SOURCE_REGION }} --db-instance-identifier {{ PRIMARY_INSTANCE.msg }} --query DBInstances[].DBInstanceStatus --output text"
+        register: primary_cluster_status
+        ignore_errors: yes
+
+      - debug:
+          msg: "{{ primary_cluster_status.stdout }}"
+        register: cluster_status
+
+      - set_fact:
+          current_status: "Current status of the {{ PRIMARY_INSTANCE.msg }} is {{ cluster_status.msg }}"
+        when: primary_cluster_status.rc == 0
+
+      - debug:
+          msg: "{{ current_status }}"
+
+      - mail:
+          from: IndexInfraMBX@spglobal.com
+          #to: kirubakaran.kannan@spglobal.com
+          to: 'InfraNotificationMBX@spglobal.com,IndexInfraMBX@spglobal.com'
+          subject: 'SPDJI AWS RDS PATCHING JOB STARTED: {{ JOB_NAME }}  Build Number {{ BUILD_NUMBER }}'
+          body: 'Minor Version Upgrade has been initiated for {{ CLUSTER_NAME }} Cluster in {{ ENVIRONMENT }} Environment and the current status is {{ current_status }}. For more details, Check console output at {{ BUILD_URL }}'
+        when: UPGRADE_TYPE == 'MinorVersion'

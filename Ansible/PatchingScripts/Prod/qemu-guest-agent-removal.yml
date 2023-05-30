@@ -1,0 +1,19 @@
+---
+- hosts: all
+  ignore_unreachable: yes
+  become: true
+  become_user: root
+  tasks:
+    - name: Remove qemu-guest-agent Package - RH8
+      dnf:
+        name: qemu-guest-agent
+        state: absent
+      ignore_errors: yes
+      when: ansible_distribution == "RedHat" and ansible_distribution_major_version == "8"
+      
+    - name: Remove qemu-guest-agent Package - RH7
+      yum:
+        name: qemu-guest-agent
+        state: absent
+      ignore_errors: yes
+      when: ansible_distribution == "RedHat" and ansible_distribution_major_version == "7"

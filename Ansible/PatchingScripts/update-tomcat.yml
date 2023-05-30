@@ -1,0 +1,88 @@
+---
+   - user:
+      name: tomcat
+      uid: 1651
+      state: present
+      home: /local/apps/tomcat
+     ignore_errors: true
+
+   - name: Install latest apache-tomcat
+     yum: name=sptomcat85 enablerepo=SPDJI_mhfi_prod_repo_APP disablerepo=* state=latest
+     ignore_errors: true
+
+   - name: Update Owner of tomcat installation
+     shell: chown -R tomcat:tomcat /local/apps/tomcat
+     ignore_errors: true
+
+   - name: Installing libfontconfig library packages for app
+     yum:
+      name:
+       - fontconfig
+       - dejavu-fonts-common
+       - dejavu-sans-fonts
+       - fontpackages-filesystem
+      state: latest
+     ignore_errors: true
+
+   - name: Set Tomcat home directory permissions
+     shell: find /local/apps/tomcat -type d -print0 |xargs -0 chmod 755 && find /local/apps/tomcat -type f -print0|xargs -0 chmod 755
+     ignore_errors: true
+
+   - name: Restore shell scripts permissions
+     shell: find /local/apps/tomcat -name "*.sh" -print0 |xargs -0 chmod +x
+     ignore_errors: true
+
+   - name: Check if tomcat is upgraded or not
+     shell: rpm -qa | grep -i sptomcat85
+     register: tomcat_new_status
+     ignore_errors: true
+      
+   - debug: var=tomcat_new_status.stdout
+
+   - name: Check if log files already exists
+     stat:
+       path: "{{ workpath }}/{{ date }}/apache-tomcat-status-{{ ENV }}-{{ currentDate }}.html"
+     register: stat_result
+     delegate_to: localhost
+
+   - name: Move all html files to backup folder
+     shell: mv "{{ workpath }}/{{ date }}/apache-tomcat-status-{{ ENV }}-{{ currentDate }}.html" "{{ workpath }}/{{ date }}/bkp-{{ currentDate }}/"
+     when: stat_result.stat.exists == True
+     delegate_to: localhost
+
+   - name: Move all log files to backup folder
+     shell: mv "{{ workpath }}/{{ date }}/apache-tomcat-status-{{ ENV }}-{{ currentDate }}.log" "{{ workpath }}/{{ date }}/bkp-{{ currentDate }}/"
+     when: stat_result.stat.exists == True
+     delegate_to: localhost
+    
+   - name: Get Tomcat update status
+     shell: |
+       hostname -i;
+       old_version={{ tomcat_status.stdout }};
+       new_version={{ tomcat_new_status.stdout }};
+       echo $old_version $new_version;
+       if [[ $old_version != $new_version ]]; then echo "Tomcat-Upgraded-successfully";
+       else echo "Tomcat-Not-Upgraded"; fi
+     ignore_errors: true
+     register: tomcat_upgrade_status
+
+   - name: Create File and update Header
+     lineinfile:
+       state: present
+       create: yes
+       owner: jenkins
+       group: jenkins
+       mode: 0755
+       insertafter: EOF
+       path: "{{ workpath }}/{{ date }}/apache-tomcat-status-{{ ENV }}-{{ currentDate }}.log"
+       line: ""
+     delegate_to: localhost
+     #run_once: true
+
+   - name: Update Tomcat status to a file
+     lineinfile:
+       state: present
+       insertafter: EOF
+       path: "{{ workpath }}/{{ date }}/apache-tomcat-status-{{ ENV }}-{{ currentDate }}.log"
+       line: "{{ tomcat_upgrade_status.stdout | replace('\n', ' ') | replace('\"', '') }}"
+     delegate_to: localhost

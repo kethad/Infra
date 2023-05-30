@@ -1,0 +1,148 @@
+---
+  - hosts: all
+    gather_facts: yes
+    become: true
+    become_user: root
+    become_method: sudo
+    ignore_unreachable: yes
+
+    tasks:
+      - name: Katello-Tracer-Upload
+        shell: "/usr/sbin/katello-tracer-upload"
+        when: "ansible_distribution_release|string == 'Ootpa'"
+        ignore_errors: yes
+
+      - name: Katello-Tracer-Upload
+        shell: "/sbin/katello-tracer-upload"
+        when: "ansible_distribution_release|string == 'Maipo'"
+        ignore_errors: yes
+        
+      - name: Get RH8 Kernel Details
+        shell: |
+          hostname -i;
+          INSTANCE_ID=$(/usr/local/bin/aws ec2 describe-instances --region "{{REGION}}" --filter Name=private-ip-address,Values="{{ inventory_hostname }}" --query 'Reservations[].Instances[].InstanceId' --output text);
+          INSTANCE_NAME=$(/usr/local/bin/aws ec2 describe-tags --region "{{REGION}}" --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=Name" --output text | cut -f5); echo $INSTANCE_NAME;
+          MODIFIED_DATE=$(sudo stat /var/log/dnf.log | grep -i Modify | awk -F" " '{ print $2 }');
+          CURRENT_DATE=$(date +%Y-%m-%d);
+          PACKAGE_UPDATE=$(dnf check-update | echo $?)
+          UPDATED_KERNEL=$(uname -r);
+          OLD_KERNEL=$(rpm -q --last kernel | head -2 | tail -1 | awk '{print $1}' | sed 's/kernel-//'); echo $OLD_KERNEL  $UPDATED_KERNEL;
+          if [[ $MODIFIED_DATE == $CURRENT_DATE && $UPDATED_KERNEL != $OLD_KERNEL && $PACKAGE_UPDATE != 0 ]]; then echo "Patching-Unsuccessful";
+          elif [[ $MODIFIED_DATE == $CURRENT_DATE && $UPDATED_KERNEL != $OLD_KERNEL && $PACKAGE_UPDATE == 0 ]]; then echo "Patching-Completed-Successfully";
+          elif [[ $MODIFIED_DATE == $CURRENT_DATE && $UPDATED_KERNEL == $OLD_KERNEL && $PACKAGE_UPDATE == 0 ]]; then echo "Patching-Completed-Successfully";
+          elif [[ $MODIFIED_DATE != $CURRENT_DATE && $UPDATED_KERNEL == $OLD_KERNEL ]];then echo "Patching-Unsuccessful";
+          else echo "Patching Interrupted"; fi
+        ignore_errors: true
+        register: rhel8_patch_result
+        when: "ansible_distribution_release|string == 'Ootpa'"
+
+      - debug:
+          msg: "{{rhel8_patch_result.stdout }}"
+        when: "ansible_distribution_release|string == 'Ootpa'"
+
+      - name: Get RH7 Kernel Details
+        shell: |
+          hostname -i;
+          INSTANCE_ID=$(/usr/local/bin/aws ec2 describe-instances --region "{{REGION}}" --filter Name=private-ip-address,Values="{{ inventory_hostname }}" --query 'Reservations[].Instances[].InstanceId' --output text);
+          INSTANCE_NAME=$(/usr/local/bin/aws ec2 describe-tags --region "{{REGION}}" --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=Name" --output text | cut -f5); echo $INSTANCE_NAME;
+          MODIFIED_DATE=$(sudo stat /var/log/yum.log | grep -i Modify | awk -F" " '{ print $2 }');
+          CURRENT_DATE=$(date +%Y-%m-%d);
+          PACKAGE_UPDATE=$(yum check-update | echo $?)
+          UPDATED_KERNEL=$(uname -r);
+          OLD_KERNEL=$(rpm -q --last kernel | head -2 | tail -1 | awk '{print $1}' | sed 's/kernel-//'); echo $OLD_KERNEL $UPDATED_KERNEL;
+          if [[ $MODIFIED_DATE == $CURRENT_DATE && $UPDATED_KERNEL != $OLD_KERNEL && $PACKAGE_UPDATE != 0 ]]; then echo "Patching-Unsuccessful";
+          elif [[ $MODIFIED_DATE == $CURRENT_DATE && $UPDATED_KERNEL != $OLD_KERNEL && $PACKAGE_UPDATE == 0 ]]; then echo "Patching-Completed-Successfully";
+          elif [[ $MODIFIED_DATE == $CURRENT_DATE && $UPDATED_KERNEL == $OLD_KERNEL && $PACKAGE_UPDATE == 0 ]]; then echo "Patching-Completed-Successfully";
+          elif [[ $MODIFIED_DATE != $CURRENT_DATE && $UPDATED_KERNEL == $OLD_KERNEL ]];then echo "Patching-Unsuccessful";
+          else echo "Patching Interrupted"; fi
+        ignore_errors: true
+        register: rhel7_patch_result
+        when: "ansible_distribution_release|string == 'Maipo'"
+
+      - debug:
+          msg: "{{rhel7_patch_result.stdout }}"
+        when: "ansible_distribution_release|string == 'Maipo'"
+        ignore_errors: yes
+
+      - name: Create File and update Header
+        lineinfile:
+          state: present
+          create: yes
+          owner: jenkins
+          group: jenkins
+          mode: 0755
+          insertafter: EOF
+          path: "{{workpath}}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/postpatch-{{ENV}}-kernelversion-{{ ansible_date_time.date }}.log"
+          line: ""
+        delegate_to: localhost
+        run_once: true
+
+      - name: Updating RH7 Patch Status
+        lineinfile:
+          state: present
+          insertafter: EOF
+          path: "{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/postpatch-{{ENV}}-kernelversion-{{ ansible_date_time.date }}.log"
+          line: "{{ rhel7_patch_result.stdout | replace('\n', ' ') | replace('\"', ' ') }}"
+        delegate_to: localhost
+        when: "ansible_distribution_release|string == 'Maipo'"
+
+      - name: Updating RH8 Patch Status
+        lineinfile:
+          state: present
+          insertafter: EOF
+          path: "{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/postpatch-{{ ENV }}-kernelversion-{{ ansible_date_time.date }}.log"
+          line: "{{ rhel8_patch_result.stdout | replace('\n', ' ') | replace('\"', ' ') }}"
+        delegate_to: localhost
+        when: "ansible_distribution_release|string == 'Ootpa'"
+
+      - name: Convert post patch Log file to HTML File
+        shell: "{{ workpath }}/convert.sh < {{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/postpatch-{{ ENV }}-kernelversion-{{ ansible_date_time.date }}.log > {{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/postpatch-{{ ENV }}-kernelversion-{{ ansible_date_time.date }}.html"
+        delegate_to: localhost
+        ignore_errors: yes
+
+      - name: Convert Apache/Tomcat status log file to HTML File
+        shell: "{{ workpath }}/convert_apache.sh < {{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/apache-tomcat-status-{{ ENV }}-{{ ansible_date_time.date }}.log > {{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/apache-tomcat-status-{{ ENV }}-{{ ansible_date_time.date }}.html"
+        delegate_to: localhost
+        ignore_errors: yes
+        
+      - name: Change file permissions
+        file:
+          path: "{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/postpatch-{{ ENV }}-kernelversion-{{ ansible_date_time.date }}.html"
+          mode : 0755
+        delegate_to: localhost
+        ignore_errors: true
+        run_once: true
+
+      - name: Change file permissions
+        file:
+          path: "{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/apache-tomcat-status-{{ ENV }}-{{ ansible_date_time.date }}.html"
+          mode : 0755
+        delegate_to: localhost
+        ignore_errors: true
+        run_once: true
+
+      - name: Post Patch Kernel Email Notification
+        mail:
+          from: 'IndexInfraMBX@spglobal.com'        
+          #to: 'kirubakaran.kannan@spglobal.com'
+          to: 'InfraNotificationMBX@spglobal.com,IndexInfraMBX@spglobal.com,SPDJIAppSupport@spglobal.com'
+          subject: 'SPDJI AWS EC2 {{ ENV }} PATCHING : POST-PATCH SERVER STATUS on {{ ENV }} {{ REG }} for {{ APPLICATION }} {{ SERVER_TYPE }}'
+          subtype: html
+          body: "{{ lookup('file', '{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/postpatch-{{ ENV }}-kernelversion-{{ ansible_date_time.date }}.html') }}" 
+          attach: "{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/postpatch-{{ ENV }}-kernelversion-{{ ansible_date_time.date }}.html"
+        delegate_to: localhost
+        run_once: true     
+        ignore_errors: true
+
+      - name: Post Patch Apache/Tomcat Status Email Notification
+        mail:
+          from: 'IndexInfraMBX@spglobal.com'        
+          #to: 'kirubakaran.kannan@spglobal.com'
+          to: 'InfraNotificationMBX@spglobal.com,IndexInfraMBX@spglobal.com,SPDJIAppSupport@spglobal.com'
+          subject: 'SPDJI AWS EC2 {{ ENV }} PATCHING : APACHE/TOMCAT UPGRADE STATUS on {{ ENV }} {{ REG }} for {{ APPLICATION }} Application'
+          subtype: html
+          body: "{{ lookup('file', '{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/apache-tomcat-status-{{ ENV }}-{{ ansible_date_time.date }}.html') }}" 
+          attach: "{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/apache-tomcat-status-{{ ENV }}-{{ ansible_date_time.date }}.html"
+        delegate_to: localhost
+        run_once: true
+        ignore_errors: true

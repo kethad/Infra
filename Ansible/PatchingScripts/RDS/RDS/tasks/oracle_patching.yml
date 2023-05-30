@@ -1,0 +1,190 @@
+---
+      - name: Get Region of the Oracle Instance
+        shell: "/usr/local/bin/aws rds describe-db-instances --region {{ item }}  --db-instance-identifier {{ CLUSTER_NAME }} --query 'DBInstances[].{Name:TagList[?Key==`Region`]|[0].Value}' --output text"
+        register: REG
+        ignore_errors: yes
+        with_items: "{{ REGION }}"
+
+      - debug:
+          msg: "{{ REG.results |map(attribute='stdout_lines') | select() | list }}"
+        ignore_errors: yes
+
+      - set_fact:
+          INSTANCE_REGION: "{{ REG.results |map(attribute='stdout_lines') | select() | list| replace('[','') | replace(']','') }}"
+        ignore_errors: yes
+
+      - name: Get the DB Instance Status
+        shell: "/usr/local/bin/aws rds describe-db-instances --region {{ INSTANCE_REGION }} --db-instance-identifier {{ CLUSTER_NAME }} --query DBInstances[].DBInstanceStatus --output text"
+        register: instance_status
+        ignore_errors: yes
+
+      - name: Debug DB Instance Status
+        debug:
+          msg: "{{ instance_status.stdout }}"
+        ignore_errors: yes
+
+      - debug:
+          msg: "{{ CLUSTER_NAME }} is in {{ instance_status.stdout }} status. We cannot proceed with upgrade now"
+        when: instance_status.stdout != 'available'
+        
+
+      - meta: end_play
+        when: instance_status.stdout != 'available'
+
+      - name: Perform Patching on Oracle RDS Instnace
+        shell: "/usr/local/bin/aws rds modify-db-instance --region {{ INSTANCE_REGION }} --db-instance-identifier {{ CLUSTER_NAME }} --engine-version {{ AVAILABLE_VERSION }} --apply-immediately"
+        register: oraclePatchInit
+        when: instance_status.stdout == 'available'
+        ignore_errors: yes
+
+      - debug:
+          msg: "{{ oraclePatchInit.stdout }}"
+
+      - name: Wait for 60 seconds
+        pause:
+          seconds: 60
+
+      - name: Fetch Oracle DB Instance Status
+        shell: "/usr/local/bin/aws rds describe-db-instances --region {{ INSTANCE_REGION }} --db-instance-identifier {{ CLUSTER_NAME }} --query DBInstances[].DBInstanceStatus --output text"
+        register: oracle_db_status_after_patch
+        ignore_errors: yes
+
+      - name: Debug Instance Status
+        debug:
+          msg: "{{ oracle_db_status_after_patch.stdout }}"
+        register: instance_status
+        when: oracle_db_status_after_patch.stdout | length > 0
+        ignore_errors: yes
+
+      - set_fact:
+          current_status: "Current status of the {{ CLUSTER_NAME }} is {{ instance_status.msg }}"
+        when: oracle_db_status_after_patch.rc == 0
+        ignore_errors: yes
+
+      - debug:
+          msg: "{{ current_status }}"
+
+      - name: Wait for Primary Cluster to Available
+        shell: "/usr/local/bin/aws rds wait --region {{ INSTANCE_REGION }} db-instance-available --db-instance-identifier {{ CLUSTER_NAME }}"
+        register: wait_for_available
+        when: oraclePatchInit.rc == 0
+
+      - name: Debug wait for available
+        debug:
+          msg: "{{ wait_for_available }}"
+
+
+      - name: Get the DB Instance Status
+        shell: "/usr/local/bin/aws rds describe-db-instances --region {{ INSTANCE_REGION }} --db-instance-identifier {{ CLUSTER_NAME }} --query DBInstances[].DBInstanceStatus --output text"
+        register: instance_status
+        until: instance_status.stdout != 'upgrading'
+        retries: 60
+        delay: 10
+        when: wait_for_available.rc == 0
+        ignore_errors: yes
+
+      - name: After patching status of RDS
+        debug:
+          msg: "Patching successfull for {{ CLUSTER_NAME }} and the current status is {{ instance_status.stdout }}"
+        when: instance_status == 'available'
+
+      - name: After patching status of RDS
+        debug:
+          msg: "Patching failed for {{ CLUSTER_NAME }} and the current status is {{ instance_status.stdout }}"
+        when: instance_status != 'available'
+
+      - name: Pause for one minute
+        pause:
+          seconds: 90
+
+      - name: Check the readReplica is available or not
+        shell: "/usr/local/bin/aws rds describe-db-instances --region {{ INSTANCE_REGION }} --db-instance-identifier {{ CLUSTER_NAME }} --query DBInstances[].ReadReplicaDBInstanceIdentifiers --output text"
+        register: read_replica_arn
+        ignore_errors: yes
+
+      - debug:
+          msg: "{{ read_replica_arn.stdout }}"
+        when: read_replica_arn.stdout != ''
+
+      - name: Get Region of the Replica Oracle Instance
+        shell: "/usr/local/bin/aws rds describe-db-instances --region {{ item }}  --db-instance-identifier {{ read_replica_arn.stdout }} --query 'DBInstances[].{Name:TagList[?Key==`Region`]|[0].Value}' --output text"
+        register: REG
+        ignore_errors: yes
+        with_items: "{{ REGION }}"
+        when: read_replica_arn.stdout != ''
+
+      - debug:
+          msg: "{{ REG.results | map(attribute='stdout_lines') | select() | list }}"
+        when: read_replica_arn.stdout != ''
+
+      - set_fact:
+          REGION: "{{ REG.results | map(attribute='stdout_lines') | select() | list| replace('[','') | replace(']','') }}"
+        when: read_replica_arn.stdout != ''
+
+      - name: Get the DB Instance Status
+        shell: "/usr/local/bin/aws rds describe-db-instances --region {{ INSTANCE_REGION }} --db-instance-identifier {{ read_replica_arn.stdout }} --query DBInstances[].DBInstanceStatus --output text"
+        register: replica_instance_status
+        until: replica_instance_status.stdout == 'upgrading'
+        retries: 60
+        delay: 10
+        ignore_errors: yes
+        when: read_replica_arn.stdout != ''
+
+      - name: Debug DB Replica Instance Status
+        debug:
+          msg: "{{ replica_instance_status.stdout }}"
+        when: read_replica_arn.stdout != ''
+
+      - debug:
+          msg: "{{ INSTANCE }} is in {{ replica_instance_status.stdout }} status."
+        when:
+          - instance_status.stdout != 'available'
+          - read_replica_arn.stdout != ''
+
+
+      - name: Wait for Rread Replica to be Available
+        shell: "/usr/local/bin/aws rds wait --region {{ INSTANCE_REGION }} db-instance-available --db-instance-identifier {{ read_replica_arn.stdout }}"
+        register: replica_wait_for_available
+        when: read_replica_arn.stdout != ''
+
+      - name: Debug wait for available
+        debug:
+          msg: "{{ replica_wait_for_available }}"
+        when: read_replica_arn.stdout != ''
+
+
+      - name: Get the Replica DB Instance Status
+        shell: "/usr/local/bin/aws rds describe-db-instances --region {{ INSTANCE_REGION }} --db-instance-identifier {{ read_replica_arn.stdout }} --query DBInstances[].DBInstanceStatus --output text"
+        register: replica_instance_status
+        until: instance_status.stdout != 'upgrading'
+        retries: 60
+        delay: 10
+        when: replica_wait_for_available.rc == 0
+        ignore_errors: yes
+
+      - name: After patching status of RDS
+        debug:
+          msg: "Patching successfull for {{ read_replica_arn.stdout }} and the current status is {{ replica_instance_status.stdout }}"
+        when: replica_instance_status.stdout == 'available'
+
+      - name: After patching status of RDS
+        debug:
+          msg: "Patching failed for {{ read_replica_arn.stdout }} and the current status is {{ replica_instance_status.stdout }}"
+        when: replica_instance_status != 'available'
+
+          #      - name: RDS Patching Job Initation notification
+          #        mail:
+          #from: IndexInfraMBX@spglobal.com
+          #to: kirubakaran.kannan@spglobal.com
+          #to: 'InfraNotificationMBX@spglobal.com,IndexInfraMBX@spglobal.com'
+          #subject: 'SPDJI AWS RDS PATCHING JOB STARTED: {{ JOB_NAME }} Build Number {{ BUILD_NUMBER }}'
+          #body: 'RDS Patching Job has been initiated in {{ ENVIRONMENT }} Environment for {{ INSTANCE }} by {{ BUILD_USER_EMAIL }} For more details, Check console output at {{ BUILD_URL }}'
+
+          #      - name: Minor Version Upgrade for Replica Cluster Initation notification
+          #mail:
+          #from: IndexInfraMBX@spglobal.com
+          #to: kirubakaran.kannan@spglobal.com
+          #to: 'InfraNotificationMBX@spglobal.com,IndexInfraMBX@spglobal.com'
+          #subject: 'SPDJI AWS RDS PATCHING JOB UPDATE: {{ JOB_NAME }} Build Number {{ BUILD_NUMBER }}'
+          #body: 'Minor Version Upgrade has been initiated for {{ CLUSTER_NAME }} Cluster in {{ INSTANCE }} Environment and the current status is {{ current_status }}. For more details, Check console output at {{ BUILD_URL }}'
+          # when: UPGRADE_TYPE == 'MinorVersion'

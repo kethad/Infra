@@ -1,0 +1,21 @@
+- hosts: all
+  become: yes
+  tasks:
+
+    - name: Updating ClientAliveInterval timeout value
+      lineinfile:
+        state: present
+        path: /etc/ssh/sshd_config
+        regexp: '{{item.ssh}}'
+        line: '{{item.timeout}}'
+        backup: yes
+      with_items:
+       - { ssh: ^ClientAliveInterval, timeout: ClientAliveInterval 1800 }
+      notify:
+      - reload sshd
+
+  handlers:
+    - name: reload sshd
+      systemd:
+        name: sshd
+        state: reloaded

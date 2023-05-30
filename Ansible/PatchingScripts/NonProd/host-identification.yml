@@ -1,0 +1,77 @@
+---
+  - name: Determining the hosts availability
+    hosts: all
+    connection: local
+    gather_facts: no
+    ignore_unreachable: yes
+
+    tasks:
+      - block:
+          - name: Identify Hosts which are up and running
+            wait_for_connection:
+              timeout: 5
+            vars:
+              ansible_connection: ssh
+          - name: Add identified hosts to group
+            group_by:
+              key: "reachable_hosts"
+        rescue:
+          - debug:
+              msg: "Unable to SSH into {{inventory_hostname}}"
+          - name: Add unidentified hosts to group
+            group_by:
+              key: "unreachable_hosts"
+
+  - name: Verify and create reachable hosts inventory file
+    hosts: reachable_hosts
+    gather_facts: yes
+
+    tasks:
+      - name: Create and write a file with reachable hosts
+        lineinfile:
+          state: present
+          create: yes
+          owner: jenkins
+          group: jenkins
+          mode: 0755
+          insertafter: EOF
+          path: "{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/reachable-hosts-{{ currentDate }}.log"
+          line: "{{ ansible_play_hosts }}"
+        delegate_to: localhost
+        run_once: true
+
+      - name: Update created reachable inventory file
+        shell: sed -i "s/^ *//g; s/['\"]//g; s/[[\"]//g; s/[]\"//g; s/[,\"]/\n/g; /^$/d" {{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/reachable-hosts-{{ currentDate }}.log
+        delegate_to: localhost
+
+  - name: Create unidentified hosts inventory
+    hosts: unreachable_hosts
+    gather_facts: no
+
+    tasks:
+      - name: Create and write a file with unreachable hosts
+        lineinfile:
+          state: present
+          create: yes
+          owner: jenkins
+          group: jenkins
+          mode: 0755
+          insertafter: EOF
+          path: "{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/unreachable-hosts-{{ currentDate }}.log"
+          line: "{{ ansible_play_hosts }}"
+        delegate_to: localhost
+        run_once: true
+
+      - name: Update created unreachable inventory file
+        shell: sed -i "s/^ *//g; s/['\"]//g; s/[[\"]//g; s/[]\"//g; s/[,\"]/\n/g; /^$/d" {{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/unreachable-hosts-{{ currentDate }}.log
+        delegate_to: localhost
+
+      - name: Send email about unreachable hosts
+        mail:
+          from: IndexInfraMBX@spglobal.com
+          #to: kirubakaran.kannan@spglobal.com
+          to: 'InfraNotificationMBX@spglobal.com,IndexInfraMBX@spglobal.com'
+          subject: 'SPDJI AWS {{ ENV }} EC2 PATCHING : UNREACHABLE HOSTS on  {{ ENV }} {{ REG }}'
+          body: "{{ lookup('file', '{{ workpath }}/{{ date }}-{{ ENV }}-{{ REG }}-{{ buildNumber }}/unreachable-hosts-{{ currentDate }}.log') }}"
+        delegate_to: localhost
+        run_once: true

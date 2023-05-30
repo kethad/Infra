@@ -1,0 +1,119 @@
+---
+  - name: Patch RH7 & RH8 Servers
+    hosts: all
+    gather_facts: yes
+    become: yes
+    become_user: root
+    ignore_unreachable: yes
+    tasks:
+
+      - name: "Override Python Interpeter for RHEL7"
+        set_fact:
+          python_interpreter: "/usr/bin/python"
+        when: "ansible_distribution_release|string == 'Maipo'"
+        ignore_errors: yes
+
+      - name: "Define Python Interpreter"
+        set_fact:
+          python_interpreter: "{{ python_interpreter }}"
+        when: "ansible_distribution_release|string == 'Maipo'"
+        ignore_errors: yes
+
+#      - name: Disable Apache and Tomcat Repos
+#        shell: subscription-manager repos --disable=SPDJI_mhfi_prod_repo_Apache --disable=SPDJI_mhfi_prod_repo_APP
+#        ignore_errors: yes
+
+      - name: clean cache - RH7
+        shell: yum clean expire-cache
+        when: "ansible_distribution_release|string == 'Maipo'"
+        ignore_errors: yes
+        vars:
+          ansible_python_interpreter: "{{ python_interpreter }}"
+
+      - name: RHEL7 Install package updates
+        yum: name="*" state=latest
+        when: "ansible_distribution_release|string == 'Maipo'"
+        ignore_errors: yes
+        vars:
+          ansible_python_interpreter: "{{ python_interpreter }}"
+
+      - name: Sleep for a min
+        pause:
+           seconds: 10
+
+#      - name: Cleanup incomplete transaction
+#        shell: "yum-complete-transaction --cleanup-only"
+#        when: ansible_distribution == "RedHat" and ansible_distribution_major_version == "7"
+
+#      - name: RHEL7 upgrade kernel package
+#        yum: name="kernel*" state=latest
+#        when: "ansible_distribution_release|string == 'Maipo'"
+#        ignore_errors: yes
+
+#      - name: RHEL8 removing kmod packaes
+#        dnf: name=['kmod-redhat-oracleasm-kernel_4_18_0_240', 'kmod-redhat-oracleasm-kernel_4_18_0_240_14_1'] state=absent
+#        when: "ansible_distribution_release|string == 'Ootpa'"
+#      - name: identify if it's oracle server
+#        shell: "id oracle"
+#        ignore_errors: yes
+#        register: oracle_user
+
+#      - name: RHEL8 removing kmod packaes
+#        dnf: name=kmod-redhat-oracleasm-kernel_4_18_0_425_10_1 state=present
+#        when: oracle_user is succeeded
+        
+
+      - name: clean expire-cache - RH8
+        shell: dnf clean expire-cache
+        when: "ansible_distribution_release|string == 'Ootpa'"
+        ignore_errors: yes
+
+      - name: RHEL8 upgrade kernel package
+        dnf: name="*" state=latest
+        when: "ansible_distribution_release|string == 'Ootpa'"
+        ignore_errors: yes
+
+#      - name: RHEL8 upgrade kernel package
+#        shell: dnf update -y --allowerasing
+#        when: "ansible_distribution_release|string == 'Ootpa'"
+#        ignore_errors: yes
+
+#      - name: identify if it's oracle server
+#        shell: "id oracle"
+#        ignore_errors: yes
+#        register: oracle_user
+
+ #     - name: downgrade kmod package
+ #       dnf:
+ #         name: 'https://foreman.infra.spdji.spgi/pub/kmod-redhat-oracleasm-2.0.8-12.2.el8.x86_64.rpm'
+ #         state: present
+ #         allow_downgrade: true
+ #       ignore_errors: yes
+ #       when: oracle_user is succeeded
+ #       register: downgrade
+
+ #     - name: Set the default kernel
+ #       shell: grubby --set-default=/boot/vmlinuz-4.18.0-425.10.1.el8_7.x86_64
+ #       when: downgrade is succeeded
+ #       ignore_errors: yes
+
+#- name: Downgrade the kmod package
+#        dnf: 
+#           name: https://foreman.infra.spdji.spgi/pub/kmod-redhat-oracleasm-2.0.8-12.2.el8.x86_64.rpm
+#           state: present
+#           allow_downgrade: true
+#        when: "ansible_distribution_release|string == 'Ootpa'"
+#        ignore_errors: yes
+        
+#      - name: Set the default kernel
+#        shell: grubby --set-default=/boot/vmlinuz-4.18.0-425.10.1.el8_7.x86_64
+
+#     - name: Sleep for a min
+#       pause:
+#          seconds: 10
+
+#      - name: RHEL8 Patching is in progress
+#        dnf: name="*" state=latest exclude="kernel*"
+#        when: "ansible_distribution_release|string == 'Ootpa'"
+#        ignore_errors: yes
+

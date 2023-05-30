@@ -1,0 +1,23 @@
+---
+ - hosts: all
+   ignore_unreachable: yes
+   become: true
+   gather_facts: yes
+   become_user: root
+
+   tasks:
+   - name: check if tomcat is already installed or not
+     shell: rpm -qa | grep -i sptomcat85
+     register: tomcat_status
+     ignore_errors: true
+
+   - include: update-tomcat.yml
+     vars:
+        ENV: "{{ ENV }}"
+        REG: "{{ REG }}"
+        buildNumber: "{{ buildNumber }}"
+        date: "{{ date }}"
+        currentDate: "{{ currentDate }}"
+        workpath: "{{ workpath }}"
+     when: tomcat_status.rc == 0
+     failed_when: "'FAILED' in tomcat_status.stderr"

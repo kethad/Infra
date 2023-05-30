@@ -1,0 +1,65 @@
+---
+      - name: Get Region of the Cluster
+        shell: "/usr/local/bin/aws rds describe-db-instances --region {{ item }} --db-instance-identifier {{ CLUSTER_NAME }} --query 'DBInstances[*].{Name:TagList[?Key==`Region`]|[0].Value}' --output text"
+        register: REG
+        ignore_errors: yes
+        with_items: "{{ REGION }}"
+
+      - debug:
+          msg: "{{ REG.results |map(attribute='stdout_lines') | select() | list }}"
+
+      - set_fact:
+          REPLICA_REGION: "{{ REG.results |map(attribute='stdout_lines') | select() | list| replace('[','') | replace(']','') }}"
+
+      - name: Fetch Secondary Instance Status
+        shell: "/usr/local/bin/aws rds describe-db-instances --region {{ REPLICA_REGION }} --db-instance-identifier {{ CLUSTER_NAME }} --query DBInstances[].DBInstanceStatus --output text"
+        register: replica_instance_status
+        ignore_errors: yes
+
+      - name: Perform Patching on Replication Instance
+        shell: "/usr/local/bin/aws rds modify-db-instance --region {{ REPLICA_REGION }} --db-instance-identifier {{ CLUSTER_NAME }} --engine-version {{ AVAILABLE_VERSION }} --apply-immediately"
+        register: replicaPatchInit
+        when: replica_instance_status.stdout == 'available'
+
+      - debug:
+          msg: "{{ replicaPatchInit.stdout }}"
+
+      - name: Wait for 60 seconds
+        pause:
+          seconds: 60
+
+      - name: Fetch Secondary Instance Status
+        shell: "/usr/local/bin/aws rds describe-db-instances --region {{ REPLICA_REGION }} --db-instance-identifier {{ CLUSTER_NAME }} --query DBInstances[].DBInstanceStatus --output text"
+        register: replica_instances_status_after_patch
+        ignore_errors: yes
+
+      - name: DB Instance Identifiers
+        debug:
+          msg: "{{ replica_instances_status_after_patch.stdout }}"
+        register: instance_status
+        when: replica_instance_status.stdout | length > 0
+
+      - set_fact:
+          current_status: "Current status of the {{ CLUSTER_NAME }} is {{ instance_status.msg }}"
+        when: replica_instance_status.rc == 0
+
+      - debug:
+          msg: "{{ current_status }}"
+
+      - name: RDS Patching Job Initation notification
+        mail:
+          from: IndexInfraMBX@spglobal.com
+          #to: kirubakaran.kannan@spglobal.com
+          to: 'InfraNotificationMBX@spglobal.com,IndexInfraMBX@spglobal.com'
+          subject: 'SPDJI AWS RDS PATCHING JOB STARTED: {{ JOB_NAME }} Build Number {{ BUILD_NUMBER }}'
+          body: 'RDS Patching Job has been initiated in {{ ENVIRONMENT }} Environment for {{ CLUSTER_NAME }} by {{ BUILD_USER_EMAIL }} For more details, Check console output at {{ BUILD_URL }}'
+
+      - name: Minor Version Upgrade for Replica Cluster Initation notification
+        mail:
+          from: IndexInfraMBX@spglobal.com
+          #to: kirubakaran.kannan@spglobal.com
+          to: 'InfraNotificationMBX@spglobal.com,IndexInfraMBX@spglobal.com'
+          subject: 'SPDJI AWS RDS PATCHING JOB UPDATE: {{ JOB_NAME }} Build Number {{ BUILD_NUMBER }}'
+          body: 'Minor Version Upgrade has been initiated for {{ CLUSTER_NAME }} Cluster in {{ ENVIRONMENT }} Environment and the current status is {{ current_status }}. For more details, Check console output at {{ BUILD_URL }}'
+        when: UPGRADE_TYPE == 'MinorVersion'
+        

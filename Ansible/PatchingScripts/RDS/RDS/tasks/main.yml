@@ -1,0 +1,32 @@
+  
+---
+- include: aurora_patch_replica_cluster.yml
+  when: AVAILABLE_VERSION is defined and ENGINE_TYPE == 'AURORA'
+
+- include: aurora_post_patch_replica.yml
+  when: AVAILABLE_VERSION is defined and ENGINE_TYPE == 'AURORA'
+
+- include: aurora_patch_primary_cluster.yml
+  when: AVAILABLE_VERSION is defined and ENGINE_TYPE == 'AURORA'
+
+- include: aurora_post_patch_primary.yml
+  when: AVAILABLE_VERSION is defined and ENGINE_TYPE == 'AURORA'
+
+- include: mysql_patch_replica_instances.yml
+  when: AVAILABLE_VERSION is defined and ENGINE_TYPE == 'MYSQL'
+
+- include: mysql_post_patch_replica.yml
+  when: AVAILABLE_VERSION is defined and ENGINE_TYPE == 'MYSQL'
+
+- include: mysql_patch_primary_instances.yml
+  when: AVAILABLE_VERSION is defined and ENGINE_TYPE == 'MYSQL'
+
+- include: mysql_post_patch_primary.yml
+  when: AVAILABLE_VERSION is defined and ENGINE_TYPE == 'MYSQL'
+
+- include: oracle_patching.yml
+  when: AVAILABLE_VERSION is defined and ENGINE_TYPE == 'ORACLE'
+  
+- debug:
+    msg: "Available Version is not defined. Kindly select the available version and run the job again"
+  when: AVAILABLE_VERSION is not defined
