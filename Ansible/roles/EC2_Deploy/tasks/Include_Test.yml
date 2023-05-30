@@ -1,0 +1,15 @@
+---
+- name: "Add to Inventory"
+  add_host:
+    hostname: "{{ INVINST }}"
+    group: "{{ EC2PARAMS.OWNER }}_{{ EC2PARAMS.ROLE }}"
+  with_items: 10.164.243.178
+  loop_control:
+    loop_var: INVINST
+#- set_facts:
+    #hosts: "{{ EC2PARAMS.OWNER }}_{{ EC2PARAMS.ROLE }}"
+- name: "LDAP Install"
+  include_role:
+    name: ldap_client_aws_dev_qa
+    
+   

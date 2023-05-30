@@ -1,0 +1,294 @@
+---
+# vars file 
+DELEGATEHOST: infra.spdji.com
+DEVSCRIPTHOST: infra.spdji.com
+#DELEGATEHOST: 10.164.241.100
+#DEVSCRIPTHOST: 10.164.241.100
+PRODSCRIPTHOST: prod.infra.spdji.com
+DRSCRIPTHOST: dr.infra.spdji.com
+#SYNTAGSCRIPT: /local/apps/infra/scripts/SyncEBSTags/SyncEBSTags.py
+SYNTAGSCRIPT: /local/apps/infra/scripts/UpdateTags/AutoUpdateTagsEC2.py
+
+DBGROUP:
+    - DB
+    - MongoDB
+    - Informatica
+    - MYSQL
+    - Oracle
+    - MSSQL
+    
+ALLOWEDROLES:
+    - DB
+    - APP
+    - Informatica
+    - MongoDB
+    - MYSQL
+    - Oracle
+    - MSSQL
+    
+LOCAL_EC2_PARAMETERS:
+     - ENV: 'DEV'
+       PLATFORM: 'INFRA'
+       APP: 'INFRA'
+       ROLE: 'APP'
+       SUBROLE: 'TEST'
+       TYPE: 't2.micro'
+       APPSG: ['sg-0d75841d67bf9003b']
+       ROOTSIZE: '10'
+       LAPPSSIZE: '1'
+       SWAPSIZE: '1'
+       COUNT: '1'
+       SEQ: '40'
+      
+LOCAL_USER_DATA: |
+    #!/bin/bash -xe
+    set -x
+    exec > >(tee /var/log/user-data.log) 2>&1
+    function updateresolve {
+        echo "options timeout:1 attempts:1 rotate" >/etc/resolv.conf
+        echo "search ec2.internal mhf.mhc" >> /etc/resolv.conf
+        echo "nameserver 10.201.226.21" >> /etc/resolv.conf
+        echo "#nameserver 10.164.232.2" >> /etc/resolv.conf
+        OS=$(uname -r | awk -F"." '{print $5}')
+        if [ $OS == 'amzn2' ]
+        then
+             echo $OS
+        else
+          if [ -L /usr/bin/python ]; then file=yes; else file=no; fi
+          OS_MAJOR_VERSION=`sed -rn 's/.*([0-9])\.[0-9].*/\1/p' /etc/redhat-release` ; if [[ ( $OS_MAJOR_VERSION == 8 ) && ( $file == "no" ) ]]; then ln -s /usr/libexec/platform-python3.6 /usr/bin/python ; fi
+          #OS_MAJOR_VERSION=`sed -rn 's/.*([0-9])\.[0-9].*/\1/p' /etc/redhat-release` ; if (( $OS_MAJOR_VERSION == 8 )); then ln -s /usr/libexec/platform-python3.6 /usr/bin/python ; fi
+        fi
+    }
+    function fixssh {
+        rm -f /tmp/fixssh.sh
+        
+        if [ $OS == 'amzn2' ]
+        then
+             echo $OS
+        else
+          OS_MAJOR_VERSION=`sed -rn 's/.*([0-9])\.[0-9].*/\1/p' /etc/redhat-release`
+          echo "$OS_MAJOR_VERSION in fixssh function"
+        fi
+        
+        if [ $OS == 'amzn2' ]
+        then
+           #sed -i 's/apps\/docker-ce-stable/os\/rhel7\/docker-RH7-stable/gi' /etc/yum.repos.d/Infra-custom.repo   ###temporary
+           yum -y install wget
+        else
+           #sed -i 's/apps\/docker-ce-stable/os\/rhel8\/docker-RH8-stable/gi' /etc/yum.repos.d/Infra-custom.repo  ###temporary
+           dnf install wget -y
+           
+        fi
+        
+        sed -i 's/^PasswordAuthentication no/\#PasswordAuthentication no/g' /etc/ssh/sshd_config
+        sed -i 's/AllowUsers/\#AllowUsers/g' /etc/ssh/sshd_config
+        systemctl restart sshd
+        
+        #cd /tmp;wget https://s3.amazonaws.com/spdji-infra-dev/fixssh.sh
+        #bash /tmp/fixssh.sh    
+        #systemctl restart sshd
+        }
+    function createfs {
+        TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"` 
+        INSTTYPE=`curl -H "X-aws-ec2-metadata-token: $TOKEN" -v http://169.254.169.254/latest/meta-data/instance-type |awk -F"." '{print $1}'|cut -c2`
+        if [ $INSTTYPE == '5' -o $INSTTYPE == '3' ]
+        then
+            /usr/bin/sleep 60
+            /usr/sbin/mkfs.xfs /dev/nvme1n1
+            /usr/bin/mkdir -p /local/apps
+            lablkid=`blkid /dev/nvme1n1 |awk '{print $2}' |tr -d "\""`
+            echo "$lablkid /local/apps xfs defaults,nodev,noatime 0 2 " >> /etc/fstab
+            /usr/bin/mount /local/apps
+            chmod 755 /local/apps
+            /usr/bin/sleep 30
+            /sbin/mkswap /dev/nvme2n1
+            swblkid=`blkid /dev/nvme2n1|awk '{print $2}' |tr -d "\""`
+            echo "$swblkid none    swap    sw      0       0 " >> /etc/fstab 
+            /sbin/swapon -a
+        else        
+             /usr/bin/sleep 60
+            /usr/sbin/mkfs.xfs /dev/xvdb
+            /usr/bin/mkdir -p /local/apps
+            lablkid=`blkid /dev/xvdb |awk '{print $2}' |tr -d "\""`
+            echo "$lablkid /local/apps xfs defaults,nodev,noatime 0 2 " >> /etc/fstab
+            /usr/bin/mount /local/apps
+            chmod 755 /local/apps
+            /usr/bin/sleep 30
+            /sbin/mkswap /dev/xvdc
+            swblkid=`blkid /dev/xvdc|awk '{print $2}' |tr -d "\""`
+            echo "$swblkid none    swap    sw      0       0 " >> /etc/fstab 
+            /sbin/swapon -a
+        fi
+        }
+    function usercreate {
+        if ! id anscm >/dev/null 2>&1
+        then
+            useradd -u 34567 -d /home/anscm -p '$6$np5GwTHT$0r/QUDPvxhaOXo6z30QfN5VOavDIVffF/iKGvQWXodq0H1lgiTT1gNkFfiXNHJJAOHcm50mUDNA8ohWfaUnqI0' -m anscm
+            echo 'anscm ALL=(ALL) NOPASSWD: ALL' >>/etc/sudoers
+            mkdir /home/anscm/.ssh
+            echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDC2vayeEMLvR/WgpxS5MHCo2eW6BPORbWYw/JNwB/UNjZfJHkLLagPRrEmk8HqieptN5OC6Y+4mcbzC5Gr6shU2Q+CBlnQ6k7jxwLkWe2HhSRqrT4HbVxGPyy8XhrlunSgVhQrcCljXb6gmK/L9xZDIDcZbuAOqj8EfThLBo1QNuGMTOXaWDxg8sAgQGqRHVa75I7czmmGy6ix0QnqejpglpdDuoZeesHS6U+T0agA3Gnd6igG59hDhREPr3J/8GmxI2bLAy4X1drIeeEH9u6TWA9IFdUR9z164xrHGLhzrg3+t547CJhF8Ht4oHSys/SXUs3a5LyQfbwIEkG6MHI1 anscm@cim-tower-prod.cicd.spglobal.com' >/home/anscm/.ssh/authorized_keys
+            chown -R anscm:anscm /home/anscm/.ssh
+            chown -R anscm:anscm /home/anscm/
+            chmod -R 700 /home/anscm/.ssh
+            chage -E -1 -M -1 anscm
+        fi
+        }
+    function mountmp {
+        mount -o remount,exec /tmp
+        }
+    updateresolve
+    usercreate
+    fixssh
+    createfs
+    mountmp
+
+MONGO_USER_DATA: |
+    #!/bin/bash -xe
+    set -x
+    exec > >(tee /var/log/user-data.log) 2>&1
+    function updateresolve {
+        #echo "options timeout:1 attempts:1 rotate" >/etc/resolv.conf
+        echo "search ec2.internal mhf.mhc" >> /etc/resolv.conf
+        echo "#nameserver 10.201.226.21" >> /etc/resolv.conf
+        echo "nameserver 10.164.232.2" >> /etc/resolv.conf
+    }
+    function createfs {
+        TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"` 
+        INSTTYPE=`curl -H "X-aws-ec2-metadata-token: $TOKEN" -v http://169.254.169.254/latest/meta-data/instance-type |awk -F"." '{print $1}'|cut -c2`
+        if [ $INSTTYPE == '5' -o $INSTTYPE == '3' ]
+        then
+            /bin/sleep 90
+            /usr/sbin/mkfs.xfs /dev/nvme1n1
+            /usr/bin/mkdir -p /local/apps
+            lablkid=`blkid /dev/nvme1n1 |awk '{print $2}' |tr -d "\""`
+            echo "$lablkid /local/apps xfs defaults,noatime,nodev 0 2 " >> /etc/fstab
+            /usr/bin/mount /local/apps
+            chmod 755 /local/apps
+            /sbin/mkswap /dev/nvme2n1
+            swblkid=`blkid /dev/nvme2n1|awk '{print $2}' |tr -d "\""`
+            echo "$swblkid none    swap    sw      0       0 " >> /etc/fstab
+            /sbin/swapon -a
+            /bin/sleep 90
+            /usr/sbin/mkfs.xfs -f /dev/nvme3n1
+            /usr/bin/mkdir -p /san/mongodb
+            mongblkid=`blkid /dev/nvme3n1|awk '{print $2}' |tr -d "\""`
+            echo "$mongblkid /san/mongodb xfs defaults,noatime,nodev 0 2 " >> /etc/fstab
+            /usr/bin/mount /san/mongodb
+            chown mongod:mongod /san/mongodb
+
+        else
+            /bin/sleep 90
+            /usr/sbin/mkfs.xfs /dev/xvdb
+            /usr/bin/mkdir -p /local/apps
+            lablkid=`blkid /dev/xvdb |awk '{print $2}' |tr -d "\""`
+            echo "$lablkid /local/apps xfs defaults,noatime,nodev 0 2 " >> /etc/fstab
+            /usr/bin/mount /local/apps
+            chmod 755 /local/apps
+            /sbin/mkswap /dev/xvdc
+            swblkid=`blkid /dev/xvdc|awk '{print $2}' |tr -d "\""`
+            echo "$swblkid none    swap    sw      0       0 " >> /etc/fstab
+            /sbin/swapon -a
+            /bin/sleep 90
+            /usr/sbin/mkfs.xfs -f /dev/xvdf
+            /usr/bin/mkdir -p /san/mongodb
+            mongblkid=`blkid /dev/xvdf |awk '{print $2}' |tr -d "\""`
+            echo "$mongblkid /san/mongodb xfs defaults,noatime,nodev 0 2 " >> /etc/fstab
+            /usr/bin/mount /san/mongodb
+            chown mongod:mongod /san/mongodb
+        fi
+
+    }
+    function mountfs {
+        if [[ `grep /san/mongodb /etc/fstab |wc -l` -eq 0 ]]
+        then
+            /usr/bin/mkdir -p /san/mongodb
+            echo " /dev/datavg/mongo-data /san/mongodb xfs defaults,noatime,nodev 0 2 " >> /etc/fstab
+            /usr/bin/mount /san/mongodb
+            chown mongod:mongod /san/mongodb
+        else
+            mount -a
+        fi
+    }
+    function usercreate {
+        echo 'mongod ALL=(ALL)       ALL' >>/etc/sudoers
+        groupadd -g 1512 mongod
+        useradd -u 1512 -g 1512 -p'$6$t6.4wqAq$LTp/8Mm2Yp85axIsIpCqJ8DnrXUePUBZD8MSJOBoL4CQiFF91S5V/XL.LUPPw3DPU/szU2KlX4.rVXqo39Uzg.' mongod
+        useradd -u 1513 -g 1512 -p'$6$tAIc/oHe$sLiN22MWEP8BmqnAmz2S.D.2vX3aQhzDQb5V7uJWACpKe64gFVkf9HFkih4h9rlw0o4ZgHPsIdWnnvU6C0uQn0' mongodb-mms
+        if ! id anscm >/dev/null 2>&1
+        then
+            useradd -u 34567 -d /home/anscm -p '$6$np5GwTHT$0r/QUDPvxhaOXo6z30QfN5VOavDIVffF/iKGvQWXodq0H1lgiTT1gNkFfiXNHJJAOHcm50mUDNA8ohWfaUnqI0' -m anscm
+            echo 'anscm ALL=(ALL) NOPASSWD: ALL' >>/etc/sudoers
+            mkdir /home/anscm/.ssh
+            echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDC2vayeEMLvR/WgpxS5MHCo2eW6BPORbWYw/JNwB/UNjZfJHkLLagPRrEmk8HqieptN5OC6Y+4mcbzC5Gr6shU2Q+CBlnQ6k7jxwLkWe2HhSRqrT4HbVxGPyy8XhrlunSgVhQrcCljXb6gmK/L9xZDIDcZbuAOqj8EfThLBo1QNuGMTOXaWDxg8sAgQGqRHVa75I7czmmGy6ix0QnqejpglpdDuoZeesHS6U+T0agA3Gnd6igG59hDhREPr3J/8GmxI2bLAy4X1drIeeEH9u6TWA9IFdUR9z164xrHGLhzrg3+t547CJhF8Ht4oHSys/SXUs3a5LyQfbwIEkG6MHI1 anscm@cim-tower-prod.cicd.spglobal.com' >/home/anscm/.ssh/authorized_keys
+            chown -R anscm:anscm /home/anscm/.ssh
+            chmod -R 700 /home/anscm/.ssh
+            chage -E -1 -M -1 anscm
+        fi
+    }
+    function limitsconf {
+        echo "mongod                hard     nofile          64000" >> /etc/security/limits.conf
+        echo "mongod                soft     nofile          64000" >> /etc/security/limits.conf
+        echo "mongod                hard     nproc           64000" >> /etc/security/limits.conf
+        echo "mongod                soft     nproc           64000" >> /etc/security/limits.conf
+        echo "mongodb-mms                hard     nofile          64000" >> /etc/security/limits.conf
+        echo "mongodb-mms                soft     nofile          64000" >> /etc/security/limits.conf
+        echo "mongodb-mms                hard     nproc           64000" >> /etc/security/limits.conf
+        echo "mongodb-mms                soft     nproc           64000" >> /etc/security/limits.conf
+        echo "mongodb-mms                soft     fsize           unlimited" >> /etc/security/limits.conf
+        echo "mongodb-mms                hard     fsize           unlimited" >> /etc/security/limits.conf
+        echo "mongod                     soft     fsize           unlimited" >> /etc/security/limits.conf
+        echo "mongod                     hard     fsize           unlimited" >> /etc/security/limits.conf
+        echo "mongodb-mms                soft     cpu             unlimited" >> /etc/security/limits.conf
+        echo "mongodb-mms                hard     cpu             unlimited" >> /etc/security/limits.conf
+        echo "mongod                     soft     cpu             unlimited" >> /etc/security/limits.conf
+        echo "mongod                     hard     cpu             unlimited" >> /etc/security/limits.conf
+    }
+    function disablehugepages {
+        wget https://s3.amazonaws.com/spdji-infra-dev/mongodb/disable-transparent-hugepages -P /etc/init.d/
+        chmod 755 /etc/init.d/disable-transparent-hugepages
+        chkconfig --add disable-transparent-hugepages
+        /etc/init.d/disable-transparent-hugepages
+    }
+    function install_netsnmp {
+        cd /tmp
+        wget https://s3.amazonaws.com/spdji-infra-dev/mongodb/netsnmprpms.tar.gz
+        tar -xvzf netsnmprpms.tar.gz
+        rpm -ivh net-snmp-agent-libs-5.7.2-24.el7_2.1.x86_64.rpm
+        rpm -ivh perl-Data-Dumper-2.145-3.el7.x86_64.rpm
+        rpm -ivh net-snmp-5.7.2-24.el7_2.1.x86_64.rpm
+        rpm -ivh net-snmp-utils-5.7.2-24.el7_2.1.x86_64.rpm
+    }
+    function fixssh {
+        rm -f /tmp/fixssh.sh
+        OS_MAJOR_VERSION=`sed -rn 's/.*([0-9])\.[0-9].*/\1/p' /etc/redhat-release`
+        echo "$OS_MAJOR_VERSION in fixssh function"
+        if [ $OS_MAJOR_VERSION -eq 7 ]
+        then
+           #sed -i 's/apps\/docker-ce-stable/os\/rhel7\/docker-RH7-stable/gi' /etc/yum.repos.d/Infra-custom.repo   ###temporary
+           yum -y install wget
+        else
+           #sed -i 's/apps\/docker-ce-stable/os\/rhel8\/docker-RH8-stable/gi' /etc/yum.repos.d/Infra-custom.repo  ###temporary
+           dnf install wget -y          
+        fi        
+        sed -i 's/^PasswordAuthentication no/\#PasswordAuthentication no/g' /etc/ssh/sshd_config
+        sed -i 's/AllowUsers/\#AllowUsers/g' /etc/ssh/sshd_config
+        systemctl restart sshd
+    }
+    updateresolve
+    usercreate
+    fixssh
+    createfs
+    mkdir -p /local/apps/mongodb;chown mongod:mongod /local/apps/mongodb
+    limitsconf
+    disablehugepages
+    #install_netsnmp
+    
+LOCAL_WIN_USER_DATA: |
+    <powershell>
+    
+    $diskNumber = 1
+    Initialize-Disk -Number $diskNumber -PartitionStyle MBR
+    New-Partition -DiskNumber $diskNumber -UseMaximumSize -DriveLetter D
+    Format-Volume -DriveLetter D -FileSystem NTFS -NewFileSystemLabel "Local Disk" -Force
+    
+    </powershell>    

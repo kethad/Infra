@@ -1,0 +1,1020 @@
+---
+- debug:
+    msg: "{{ EC2PARAMS }}"
+
+- fail: 
+    msg: "Wrong ROLE mentioned. ROLE should be one of these {{ ALLOWEDROLES }}"
+  when: EC2PARAMS.ROLE not in ALLOWEDROLES
+  
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-3e24bf58
+    SUBNETS: ['subnet-19cd2f52','subnet-22b76e46','subnet-814214ac','subnet-5fdf9204']
+    DSG: ['sg-4615483a','sg-9581a6e1']
+    IAMROLE: DEV_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    #AMI: "{{ NONPRODAMI }}"
+    EBS_KEY: '12739c25-6a4d-4a8e-8557-a9162d0fc7ce'
+    KEYPAIR: 'DEV_VPC_Key'
+    ENVIRONMENTTAG: 'DEV'
+  when: EC2PARAMS.ENV == "DEV-USE1" and EC2PARAMS.ROLE not in DBGROUP or ENVIRONMENT == 'DEV1-USE1' or ENVIRONMENT == 'DEV2-USE1'
+  
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-3e24bf58
+    SUBNETS: ['subnet-5fdf9204','subnet-1fb36a7b','subnet-d2cc2e99','subnet-814214ac']
+    DSG: ['sg-4615483a','sg-9581a6e1']
+    IAMROLE: DEV_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    #AMI: "{{ NONPRODAMI }}"
+    KEYPAIR: 'DEV_VPC_Key'
+    EBS_KEY: '12739c25-6a4d-4a8e-8557-a9162d0fc7ce'
+    ENVIRONMENTTAG: 'DEV'
+  when: EC2PARAMS.ENV == "DEV-USE1" and EC2PARAMS.ROLE in DBGROUP or ENVIRONMENT == 'DEV1-USE1' or ENVIRONMENT == 'DEV2-USE1'
+
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-d65377b0
+    SUBNETS: ['subnet-8de7a2e8','subnet-f68380db','subnet-eef3a3e2','subnet-1e182645','subnet-f57391be']
+    DSG: ['sg-e463df9b','sg-e1c1e095']
+    IAMROLE: QA_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    #AMI: "{{ NONPRODAMI }}"
+    EBS_KEY: 'bb799a3e-3f25-4f88-8427-e760fb7dae39'
+    KEYPAIR: 'DEV_VPC_Key'
+    #ZONE: ['us-east-1a','us-east-1b','us-east-1c','us-east-1d']
+    ENVIRONMENTTAG: 'QA'
+  when: EC2PARAMS.ENV == "QA-USE1" and EC2PARAMS.ROLE not in DBGROUP or ENVIRONMENT == 'QA1-USE1' or ENVIRONMENT == 'QA2-USE1' or ENVIRONMENT == 'PRODFIX-USE1'
+  
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-d65377b0
+    SUBNETS: ['subnet-d6f8fbfb','subnet-7e1b2525','subnet-d8789a93','subnet-93da9ff6','subnet-15f3a319']
+    DSG: ['sg-e463df9b','sg-e1c1e095']
+    IAMROLE: QA_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    #AMI: "{{ NONPRODAMI }}"
+    EBS_KEY: 'bb799a3e-3f25-4f88-8427-e760fb7dae39'
+    KEYPAIR: 'DEV_VPC_Key'
+    #ZONE: ['us-east-1a','us-east-1b','us-east-1c','us-east-1d']
+    ENVIRONMENTTAG: 'QA'
+  when: EC2PARAMS.ENV == "QA-USE1" and EC2PARAMS.ROLE in DBGROUP or ENVIRONMENT == 'QA1-USE1' or ENVIRONMENT == 'QA2-USE1' or ENVIRONMENT == 'PRODFIX-USE1'
+
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-c597a5bd
+    SUBNETS: ['subnet-da2eb3f5','subnet-cf7aeb92']
+    DSG: ['sg-7db34234','sg-a887a0dc']
+    IAMROLE: QA_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    #AMI: "{{ NONPRODAMI }}"
+    EBS_KEY: '276ead8e-2253-4a04-99c1-25d6e812a128'
+    KEYPAIR: 'DEV_VPC_Key'
+    ENVIRONMENTTAG: 'UAT'
+  when: EC2PARAMS.ENV == "UAT-USE1" and EC2PARAMS.ROLE not in DBGROUP
+
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-c597a5bd
+    SUBNETS: ['subnet-5a7bea07','subnet-0ed22f3e46ebb28e4','subnet-e824b9c7']
+    DSG: ['sg-7db34234','sg-a887a0dc']
+    IAMROLE: QA_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    #AMI: "{{ NONPRODAMI }}"
+    EBS_KEY: '276ead8e-2253-4a04-99c1-25d6e812a128'
+    KEYPAIR: 'DEV_VPC_Key'
+    ENVIRONMENTTAG: 'UAT'
+  when: EC2PARAMS.ENV == "UAT-USE1" and EC2PARAMS.ROLE in DBGROUP
+
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-9f4172e7
+    SUBNETS: ['subnet-68158747','subnet-82af39df']
+    DSG: ['sg-0d91fcd9291496063','sg-8286a1f6']
+    IAMROLE: QA_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    #AMI: "{{ NONPRODAMI }}"
+    EBS_KEY: '276ead8e-2253-4a04-99c1-25d6e812a128'
+    KEYPAIR: 'DEV_VPC_Key'
+    ENVIRONMENTTAG: 'PREPROD'
+  when: EC2PARAMS.ENV == "STG" and EC2PARAMS.ROLE not in DBGROUP
+
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-9f4172e7
+    SUBNETS: ['subnet-e21d8fcd','subnet-f0ae38ad']
+    DSG: ['sg-0d91fcd9291496063','sg-8286a1f6']
+    IAMROLE: QA_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    #AMI: "{{ NONPRODAMI }}"
+    EBS_KEY: '276ead8e-2253-4a04-99c1-25d6e812a128'
+    KEYPAIR: 'DEV_VPC_Key'
+    ENVIRONMENTTAG: 'PREPROD'
+  when: EC2PARAMS.ENV == "STG" and EC2PARAMS.ROLE in DBGROUP
+
+
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-1c5ec57a
+    SUBNETS: ['subnet-03a9d1b50ad722dc9','subnet-0acb5d243533f32a7','subnet-82e4b3af']
+    DSG: ['sg-db0d50a7','sg-d39eb9a7']
+    IAMROLE: EC2_PROD_Role
+    ASSUMEROLE: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+    SCRIPTHOST: "{{ PRODSCRIPTHOST }}"
+    AMI: "{{ PRODAMI }}"
+    EBS_KEY: 'e451ee73-f369-419f-b258-1fd3fe58adb3'
+    KEYPAIR: 'PROD-VPC-INFRA'
+    ENVIRONMENTTAG: 'PROD'
+  when: EC2PARAMS.ENV == "PROD-USE1" and EC2PARAMS.ROLE not in DBGROUP
+
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-1c5ec57a
+    SUBNETS: ['subnet-0acb5d243533f32a7','subnet-03a9d1b50ad722dc9','subnet-86e4b3ab']
+    DSG: ['sg-db0d50a7','sg-d39eb9a7']
+    IAMROLE: EC2_PROD_Role
+    ASSUMEROLE: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+    SCRIPTHOST: "{{ PRODSCRIPTHOST }}"
+    AMI: "{{ PRODAMI }}"
+    EBS_KEY: 'e451ee73-f369-419f-b258-1fd3fe58adb3'
+    KEYPAIR: 'PROD-VPC-INFRA'
+    ENVIRONMENTTAG: 'PROD'
+  when: EC2PARAMS.ENV == "PROD-USE1" and EC2PARAMS.ROLE in DBGROUP
+
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-1c5ec57a
+    SUBNETS: ['subnet-0538112afffd9202f','subnet-035b1e3d366957308','subnet-0dee3b83ebb486c19']
+    DSG: ['sg-db0d50a7','sg-d39eb9a7']
+    IAMROLE: EC2_PROD_Role
+    ASSUMEROLE: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+    SCRIPTHOST: "{{ PRODSCRIPTHOST }}"
+    AMI: "{{ PRODAMI }}"
+    EBS_KEY: 'e451ee73-f369-419f-b258-1fd3fe58adb3'
+    KEYPAIR: 'PROD-VPC-INFRA'
+    ENVIRONMENTTAG: 'PREPROD'
+  when: EC2PARAMS.ENV == "SPRT" and EC2PARAMS.ROLE not in DBGROUP
+
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-1c5ec57a
+    SUBNETS: ['subnet-0538112afffd9202f','subnet-035b1e3d366957308','subnet-0dee3b83ebb486c19']
+    DSG: ['sg-db0d50a7','sg-d39eb9a7']
+    IAMROLE: EC2_PROD_Role
+    ASSUMEROLE: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+    SCRIPTHOST: "{{ PRODSCRIPTHOST }}"
+    AMI: "{{ PRODAMI }}"
+    EBS_KEY: 'e451ee73-f369-419f-b258-1fd3fe58adb3'
+    KEYPAIR: 'PROD-VPC-INFRA'
+    ENVIRONMENTTAG: 'PREPROD'
+  when: EC2PARAMS.ENV == "SPRT" and EC2PARAMS.ROLE in DBGROUP
+  
+- set_fact:
+    REGION: us-west-2
+    VPCID: vpc-4092e927
+    SUBNETS: ['subnet-9e7c75c6','subnet-c67bd18f','subnet-674ede00']
+    DSG: ['sg-ce6e80b5','sg-5a988d26']
+    IAMROLE: EC2_DR_Role
+    ASSUMEROLE: 'arn:aws:iam::210265922058:role/DR-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DRSCRIPTHOST }}"
+    AMI: "{{ DRAMI }}"
+    EBS_KEY: 'c26c7eed-ba05-46d4-99c9-14477cd7a33d'
+    KEYPAIR: 'DR-VPC-INFRA'
+    ENVIRONMENTTAG: 'DR'
+  when: EC2PARAMS.ENV == "DR2-USW2" and EC2PARAMS.ROLE not in DBGROUP
+
+- set_fact:
+    REGION: us-west-2
+    VPCID: vpc-4092e927
+    SUBNETS: ['subnet-c57bd18c','subnet-664ede01','subnet-9c7c75c4']
+    DSG: ['sg-ce6e80b5','sg-5a988d26']
+    IAMROLE: EC2_DR_Role
+    ASSUMEROLE: 'arn:aws:iam::210265922058:role/DR-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DRSCRIPTHOST }}"
+    AMI: "{{ DRAMI }}"
+    EBS_KEY: 'c26c7eed-ba05-46d4-99c9-14477cd7a33d'
+    KEYPAIR: 'DR-VPC-INFRA'
+    ENVIRONMENTTAG: 'DR'
+  when: EC2PARAMS.ENV == "DR2-USW2" and EC2PARAMS.ROLE in DBGROUP
+
+- set_fact:
+    REGION: us-west-2
+    VPCID: vpc-0dac0071e5643ccb3
+    SUBNETS: ['subnet-0e50084b3f95eb986','subnet-0fa46c0ba7bf9cfca','subnet-072c5ed567ef0f9a1']
+    DSG: ['sg-01ade5b2e2c442408']
+    IAMROLE: EC2_PROD_Role
+    ASSUMEROLE: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+    SCRIPTHOST: "{{ PRODSCRIPTHOST }}"
+    AMI: "{{ DR1AMI }}"
+    EBS_KEY: '5e13ad8c-8ef2-4e3b-a2b7-6154bd5f3604'
+    KEYPAIR: 'DR1-VPC-01'
+    ENVIRONMENTTAG: 'DR'
+  when: EC2PARAMS.ENV == "DR-USW2"
+  
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-057a7683cf77f5bef
+    SUBNETS: ['subnet-0538112afffd9202f','subnet-035b1e3d366957308','subnet-0dee3b83ebb486c19']
+    DSG: ['sg-0843ffdbe348ea853']
+    IAMROLE: EC2_PREPROD_Role
+    ASSUMEROLE: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+    SCRIPTHOST: "{{ PRODSCRIPTHOST }}"
+    AMI: "{{ PRODAMI }}"
+    EBS_KEY: 'c1167bfb-9503-4639-b887-cf78a30b8adb'
+    KEYPAIR: 'PROD-VPC-INFRA'
+    ENVIRONMENTTAG: 'PREPROD'
+  when: EC2PARAMS.ENV == "PREPROD-USE1" or EC2PARAMS.ENV == "PREPROD1-USE1"
+  
+- set_fact:
+    REGION: eu-west-1
+    VPCID: vpc-0aa0e31c576b3d955
+    SUBNETS: ['subnet-02c648726a01f7049','subnet-0758b001959751442','subnet-097278dcd5968b362']
+    DSG: ['sg-0f1ddfb94e9060781']
+    IAMROLE: EC2_PROD_Role
+    ASSUMEROLE: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+    SCRIPTHOST: "{{ PRODSCRIPTHOST }}"
+    AMI: "{{ PROD_EUW1_AMI }}"
+    EBS_KEY: '0c85bb3f-6882-4bc3-96b6-282f4f97df1d'
+    KEYPAIR: 'PROD-EUW1-EC2'
+    ENVIRONMENTTAG: 'PROD'
+  when: EC2PARAMS.ENV == "PROD-EUW1"
+  
+- set_fact:
+    REGION: us-west-2
+    VPCID: vpc-02c98dda145d24c49
+    SUBNETS: ['subnet-02b07a3c6fa9fdfcf','subnet-09f00bfd87914c885','subnet-0c8e4e77b4e161078']
+    DSG: ['sg-0e383dce3db35d4e1']
+    IAMROLE: QA_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    #AMI: "{{ USW2_NONPRODAMI }}"
+    EBS_KEY: '816528aa-fc92-4b72-88d0-cbc4f611fd73'
+    KEYPAIR: 'DEV-USW2-VPC-01'
+    #ZONE: ['us-east-1a','us-east-1b','us-east-1c','us-east-1d']
+    ENVIRONMENTTAG: 'QA'
+  when: EC2PARAMS.ENV == "QA-USW2" or  ENVIRONMENT == 'QA1-USW2' or ENVIRONMENT == 'QA2-USW2' or ENVIRONMENT == 'PRODFIX-USW2'
+  
+- set_fact:
+    REGION: us-west-2
+    VPCID: vpc-0b4dd997c1deb0ce7
+    SUBNETS: ['subnet-03cfb05029d8e983f','subnet-04b88cb400a71b1e6','subnet-0e7eb762d492c4ac6']
+    DSG: ['sg-00bd30cd86a348b9a']
+    IAMROLE: DEV_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    #AMI: "{{ USW2_NONPRODAMI }}"
+    EBS_KEY: '8e239b81-1de2-4784-b02f-99b4a2410589'
+    KEYPAIR: 'DEV-USW2-VPC-01'
+    #ZONE: ['us-east-1a','us-east-1b','us-east-1c','us-east-1d']
+    ENVIRONMENTTAG: 'DEV'
+  when: EC2PARAMS.ENV == "DEV-USW2" or ENVIRONMENT == 'DEV1-USW2' or ENVIRONMENT == 'DEV2-USW2'
+  
+- set_fact:
+    REGION: us-west-2
+    VPCID: vpc-019d0375eb1f78752
+    SUBNETS: ['subnet-025a99a084dbf1e12','subnet-046c59869902a6e21','subnet-060cc0241b82d9667']
+    DSG: ['sg-05101a7afc42e8226']
+    IAMROLE: QA_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    #AMI: "{{ USW2_NONPRODAMI }}"
+    EBS_KEY: '25c9923f-2e3e-4511-b8f4-f28f4d4415a2'
+    KEYPAIR: 'DEV-USW2-VPC-01'
+    ENVIRONMENTTAG: 'DEV'
+  when: EC2PARAMS.ENV == "UAT-USW2" 
+
+- set_fact:
+    REGION: us-west-2
+    VPCID: vpc-0febfc2d9804f96f7
+    SUBNETS: ['subnet-03535d58fb9b208ae','subnet-0c8ae9cae1f39869d','subnet-038d1e632709ca2f5']
+    DSG: ['sg-042c7d4c90b076d1e']
+    IAMROLE: EC2_PREPROD_Role
+    ASSUMEROLE: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+    SCRIPTHOST: "{{ PRODSCRIPTHOST }}"
+    AMI: "{{ DRAMI }}"
+    EBS_KEY: '85fa3e52-9004-4f52-928d-32c76da90c3d'
+    KEYPAIR: 'DR-PREPROD-01'
+    ENVIRONMENTTAG: 'PREPROD'
+  when: EC2PARAMS.ENV == "PREPROD-USW2" or EC2PARAMS.ENV == "PREPROD1-USW2"
+  
+- set_fact:
+    TAGOWNERFL: "{{ EC2PARAMS.PLATFORM | regex_replace('SPDJI','') }}"
+    
+- set_fact:
+    TAGAPPTYPE: "{{ EC2PARAMS.ENV }}-SPDJI-{{ TAGOWNERFL }}-{{ EC2PARAMS.APP }}-{{ EC2PARAMS.SUBROLE }}"
+  when: ( EC2PARAMS.APP != '' and EC2PARAMS.APP !=  EC2PARAMS.PLATFORM ) and EC2PARAMS.SUBROLE != ''
+- set_fact:
+    TAGAPPTYPE: "{{ EC2PARAMS.ENV }}-SPDJI-{{ TAGOWNERFL }}-{{ EC2PARAMS.APP }}"
+  when: ( EC2PARAMS.APP != '' and EC2PARAMS.APP !=  EC2PARAMS.PLATFORM ) and EC2PARAMS.SUBROLE == ''
+- set_fact:
+    TAGAPPTYPE: "{{ EC2PARAMS.ENV }}-SPDJI-{{ TAGOWNERFL }}-{{ EC2PARAMS.SUBROLE }}"
+  when: ( EC2PARAMS.APP != '' and EC2PARAMS.APP ==  EC2PARAMS.PLATFORM  ) and EC2PARAMS.SUBROLE != ''
+- set_fact:
+    TAGAPPTYPE: "{{ EC2PARAMS.ENV }}-SPDJI-{{ TAGOWNERFL }}"
+  when: ( EC2PARAMS.APP != '' and EC2PARAMS.APP ==  EC2PARAMS.PLATFORM  ) and EC2PARAMS.SUBROLE == ''  
+- set_fact:
+    TAGAPPTYPE: "{{ EC2PARAMS.ENV }}-SPDJI-{{ TAGOWNERFL }}"
+  when: EC2PARAMS.APP == '' and EC2PARAMS.SUBROLE == ''
+  
+- set_fact:
+    TAGAPPTYPE: "{{ EC2PARAMS.ENV }}-SPDJI-{{ TAGOWNERFL }}-{{ EC2PARAMS.SUBROLE }}"
+  when: EC2PARAMS.APP == '' and EC2PARAMS.SUBROLE != ''  
+
+- set_fact:
+    TAGNAME: "{{ EC2PARAMS.ENV }}-{{ EC2PARAMS.PLATFORM }}-{{ BUILD_NUMBER }}-{{ EC2PARAMS.SEQ }}"
+    TAGOWNER: "{{ EC2PARAMS.PLATFORM }}"
+    TAGROLE: "{{ EC2PARAMS.ROLE }}"
+  when: EC2PARAMS.ROLE not in DBGROUP and ( EC2PARAMS.SUBROLE == '' and EC2PARAMS.APP == '' )
+  
+- set_fact:
+    TAGNAME: "{{ EC2PARAMS.ENV }}-{{ EC2PARAMS.PLATFORM }}-{{ EC2PARAMS.SUBROLE }}-{{ BUILD_NUMBER }}-{{ EC2PARAMS.SEQ }}"
+    TAGOWNER: "{{ EC2PARAMS.PLATFORM }}"
+    TAGROLE: "{{ EC2PARAMS.ROLE }}"
+  when: EC2PARAMS.ROLE not in DBGROUP and ( EC2PARAMS.SUBROLE != '' and EC2PARAMS.APP == '' )
+  
+- set_fact:
+    TAGNAME: "{{ EC2PARAMS.ENV }}-{{ EC2PARAMS.PLATFORM }}-{{ EC2PARAMS.APP }}-{{ EC2PARAMS.SUBROLE }}-{{ BUILD_NUMBER }}-{{ EC2PARAMS.SEQ }}"
+    TAGOWNER: "{{ EC2PARAMS.PLATFORM }}"
+    TAGROLE: "{{ EC2PARAMS.ROLE }}"
+  when: EC2PARAMS.ROLE not in DBGROUP and ( EC2PARAMS.SUBROLE != '' and EC2PARAMS.APP != '' )
+  
+- set_fact:
+    TAGNAME: "{{ EC2PARAMS.ENV }}-{{ EC2PARAMS.PLATFORM }}-{{ EC2PARAMS.APP }}-{{ BUILD_NUMBER }}-{{ EC2PARAMS.SEQ }}"
+    TAGOWNER: "{{ EC2PARAMS.PLATFORM }}"
+    TAGROLE: "{{ EC2PARAMS.ROLE }}"
+  when: EC2PARAMS.ROLE not in DBGROUP and ( EC2PARAMS.SUBROLE == '' and EC2PARAMS.APP != '' )
+  
+- set_fact:
+    TAGNAME: "{{ EC2PARAMS.ENV }}-{{ EC2PARAMS.PLATFORM }}-{{ EC2PARAMS.ROLE }}-{{ BUILD_NUMBER }}-{{ EC2PARAMS.SEQ }}"
+    TAGOWNER: "{{ EC2PARAMS.PLATFORM }}"
+    TAGROLE: "{{ EC2PARAMS.ROLE }}"
+  when: EC2PARAMS.ROLE in DBGROUP and ( EC2PARAMS.SUBROLE == '' and EC2PARAMS.APP == '' )
+  
+- set_fact:
+    TAGNAME: "{{ EC2PARAMS.ENV }}-{{ EC2PARAMS.PLATFORM }}-{{ EC2PARAMS.APP }}-{{ EC2PARAMS.ROLE }}-{{ EC2PARAMS.SUBROLE }}-{{ BUILD_NUMBER }}-{{ EC2PARAMS.SEQ }}"
+    TAGOWNER: "{{ EC2PARAMS.PLATFORM }}"
+    TAGROLE: "{{ EC2PARAMS.ROLE }}"
+  when: EC2PARAMS.ROLE in DBGROUP and ( EC2PARAMS.SUBROLE != '' and EC2PARAMS.APP != '' )
+  
+- set_fact:
+    TAGNAME: "{{ EC2PARAMS.ENV }}-{{ EC2PARAMS.PLATFORM }}-{{ EC2PARAMS.APP }}-{{ EC2PARAMS.ROLE }}-{{ BUILD_NUMBER }}-{{ EC2PARAMS.SEQ }}"
+    TAGOWNER: "{{ EC2PARAMS.PLATFORM }}"
+    TAGROLE: "{{ EC2PARAMS.ROLE }}"
+  when: EC2PARAMS.ROLE in DBGROUP and ( EC2PARAMS.SUBROLE == '' and EC2PARAMS.APP != '' )
+- set_fact:
+    TAGNAME: "{{ EC2PARAMS.ENV }}-{{ EC2PARAMS.PLATFORM }}-{{ EC2PARAMS.ROLE }}-{{ EC2PARAMS.SUBROLE }}-{{ BUILD_NUMBER }}-{{ EC2PARAMS.SEQ }}"
+    TAGOWNER: "{{ EC2PARAMS.PLATFORM }}"
+    TAGROLE: "{{ EC2PARAMS.ROLE }}"
+  when: EC2PARAMS.ROLE in DBGROUP and ( EC2PARAMS.SUBROLE != '' and EC2PARAMS.APP == '' )
+  
+#- set_fact:
+ #   APPSG: '[]'
+  #when: EC2PARAMS.APPSG is undefined or EC2PARAMS.APPSG == ''
+
+- set_fact:
+    APPSG: "{{ EC2PARAMS.APPSG }}"
+  when: EC2PARAMS.APPSG is defined
+
+- set_fact:
+    DATADOG: "{{ EC2PARAMS.DATADOG }}"
+  when: EC2PARAMS.DATADOG is defined
+  
+- set_fact:
+    DATADOG: "True"
+  when: (EC2PARAMS.DATADOG is undefined or EC2PARAMS.DATADOG == '')
+
+    
+- set_fact:
+    SG: "{{ DSG }} + {{ APPSG }}"
+  when: (APPSG is defined and APPSG != [''])
+
+- set_fact:
+    SG: "{{ DSG }}"
+  when: (APPSG is undefined or APPSG == [''])
+
+- set_fact:
+    ELB: "{{ EC2PARAMS.ELB }}"
+  when: EC2PARAMS.ELB is defined and EC2PARAMS.ELB != ''
+
+- set_fact:
+    ELB: "NOELB"
+  when: EC2PARAMS.ELB is undefined or EC2PARAMS.ELB == ''
+
+#- set_fact:
+    #BUILDID="{{ tower_job_id }}"
+    #BUILDID="{{ BUILD_NUMBER }}"
+  #when: BUILD_NUMBER is undefined
+
+#- name: "Add Dynamodb Entry number and app"
+ # shell: /local/apps/infra/scripts/BuildScripts/UpdateBuildState.py AppName="{{ APP }}" BuildID="{{ BUILD_NUMBER }}"
+  #delegate_to: "{{ SCRIPTHOST }}"
+  #remote_user: infra
+
+- debug:
+    msg: "{{ SG }}"
+  
+
+- set_fact:
+    USER_DATA: "{{ LOCAL_USER_DATA }}"
+  when: USER_DATA is undefined
+
+- set_fact:
+    ADDTL_DEV: /dev/null
+  when: (EC2PARAMS.ADDITIONAL_VOL is undefined or EC2PARAMS.ADDITIONAL_VOL != 'YES' )
+  
+- set_fact:
+    ADDTL_DEV: /dev/sdf
+  when: (EC2PARAMS.ADDITIONAL_VOL is defined and EC2PARAMS.ADDITIONAL_VOL == 'YES')
+
+- set_fact:
+    ADDTL_DEV_SIZE: "{{ EC2PARAMS.ADDITIONAL_VOL_SIZE  }}"
+  when: EC2PARAMS.ADDITIONAL_VOL_SIZE is defined
+
+- set_fact:
+    ADDTL_DEV_SIZE: '0'
+  when: EC2PARAMS.ADDITIONAL_VOL_SIZE is undefined
+  
+- name: LASTSUBNET is undefined
+  set_fact:
+    LASTSUBNET: ['subnet']
+  when: LASTSUBNET is undefined
+  
+- name: LASTSUBNET before subnet selection
+  debug: 
+    msg: "{{ LASTSUBNET }}"
+  ignore_errors: true
+
+- name: Select Subnet
+  set_fact:
+    SUBNET: "{{ SUBNETS | difference(LASTSUBNET) | random }}"
+  
+  #until: SUBNET != LASTSUBNET
+  #retries: 999
+
+- name: Getting Session of Assumed Role
+  sts_assume_role:
+    region: "{{ REGION }}"
+    role_arn: "{{ ASSUMEROLE }}"
+    role_session_name: 'spdji-provision'
+  delegate_to: "{{ DELEGATEHOST }}"
+  register: assumed_role
+  #when: "ACTION != 'SKIP'"
+  
+- ec2_instance_facts:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    region: "{{ REGION }}"
+    filters:
+        "tag:Name": "{{ TAGNAME }}"
+        "instance-state-name" : ['pending ','running','shutting-down','stopping','stopped']
+  delegate_to: localhost
+  register: ec2_facts
+  #when: "ACTION != 'SKIP'"
+
+- debug:
+    msg: "{{ ec2_facts }}"
+
+#- ec2_eni_facts:
+ #   aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+  #  aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+   # security_token: "{{ assumed_role.sts_creds.session_token }}"
+    #region: "{{ REGION }}"
+    #filters:
+    #    addresses.private-ip-address: "{{ ec2_facts.instances[0].private_ip_address }}"
+  #register: meta_out
+  #when: (ec2_facts.instances | length  > 0)
+  
+#- debug:
+ #   msg: "{{ meta_out }}" 
+    
+#- shell: MAC=`curl http://169.254.169.254/latest/meta-data/network/interfaces/macs/ 2>/dev/null`;curl http://169.254.169.254/latest/meta-data/network/interfaces/macs/$MAC/subnet-id/
+ # delegate_to: "{{ ec2_facts.instances[0].private_ip_address}}"
+  #register: meta_out
+  #when: (ec2_facts.instances | length  > 0)
+
+- set_fact: 
+    ACTION: "SKIP"
+    #SUBNET: "{{ meta_out.interfaces[0].subnet_id }}" 
+    SUBNET: "{{ ec2_facts.instances[0].subnet_id }}" 
+  when: (ec2_facts.instances | length  > 0)
+
+- debug:
+    msg: "Instance {{ TAGNAME }} Already Exists"
+  when: (ec2_facts.instances | length  > 0)
+  
+- set_fact: 
+    ACTION: "PROCEED"  
+  when: (ec2_facts.instances | length  <= 0 )
+  
+#- name: Current date time variable
+  #set_fact: BDT="{{lookup('pipe','date \"+%Y-%m-%d %H:%M:%S\"')}}"
+ 
+- name: Setting build date variable 
+  set_fact: BDate="{{lookup('pipe','date \"+%Y-%m-%d \"')}}"
+
+- name: Setting build time variable
+  set_fact: BTime="{{lookup('pipe','date \"+%H:%M:%S \"')}}"
+
+
+####RHEL7 Current Month AMI Selection based on Environment and User AMI Parameter Input
+
+- set_fact:
+    IAMI: "{{ RH7_VA_NonProd_Current }}"
+  when:
+    - ENVIRONMENT == "DEV-USE1" or ENVIRONMENT == 'DEV1-USE1' or ENVIRONMENT == 'DEV2-USE1' or
+      ENVIRONMENT == "QA-USE1" or ENVIRONMENT == 'QA1-USE1' or ENVIRONMENT == 'QA2-USE1' or ENVIRONMENT == 'PRODFIX-USE1' or
+      ENVIRONMENT == "UAT-USE1"
+    - AMI == "RHEL7-Current"
+
+#- set_fact:
+    #AMI: "{{ RH7_PROD_Current }}"
+  #when:
+    #- ENVIRONMENT == "PROD-USE1" or ENVIRONMENT == "PREPROD-USE1" or ENVIRONMENT == "PREPROD-USW2" or ENVIRONMENT == "PREPROD1-USE1"
+    #- AMI == "RHEL7-Current"
+
+#- set_fact:
+    #AMI: "{{ RH7_DR_Current }}"
+  #when:
+    #- ENVIRONMENT == "DR-USW2"
+    #- AMI == "RHEL7-Current"
+
+#- set_fact:
+    #AMI: "{{ RH7_DR2_Current }}"
+  #when:
+    #- ENVIRONMENT == "DR2-USW2"
+    #- AMI == "RHEL7-Current"
+
+#- set_fact:
+    #AMI: "{{ RH7_IE_PROD_Current }}"
+  #when:
+    #- ENVIRONMENT == "PROD-EUW1"
+    #- AMI == "RHEL7-Current"
+
+- set_fact:
+     IAMI: "{{ RH7_OR_NonProd_Current }}"
+  when:
+     - ENVIRONMENT == "QA-USW2" or  ENVIRONMENT == 'QA1-USW2' or ENVIRONMENT == 'QA2-USW2' or ENVIRONMENT == 'PRODFIX-USW2' or
+       ENVIRONMENT == "DEV-USW2" or ENVIRONMENT == 'DEV1-USW2' or ENVIRONMENT == 'DEV2-USW2' or
+       ENVIRONMENT == "UAT-USW2"
+     - AMI == "RHEL7-Current"
+
+
+####RHEL7 Previous Month AMI Selection based on Environment and User AMI Parameter Input
+
+- set_fact:
+    IAMI: "{{ RH7_VA_NonProd_PrevM }}"
+  when:
+    - ENVIRONMENT == "DEV-USE1" or ENVIRONMENT == 'DEV1-USE1' or ENVIRONMENT == 'DEV2-USE1' or
+      ENVIRONMENT == "QA-USE1" or ENVIRONMENT == 'QA1-USE1' or ENVIRONMENT == 'QA2-USE1' or ENVIRONMENT == 'PRODFIX-USE1' or
+      ENVIRONMENT == "UAT-USE1"
+    - AMI == "RHEL7-Previous-Month"
+
+#- set_fact:
+    #AMI: "{{ RH7_PROD_PrevM }}"
+  #when:
+    #- ENVIRONMENT == "PROD-USE1" or ENVIRONMENT == "PREPROD-USE1" or ENVIRONMENT == "PREPROD-USW2" or ENVIRONMENT == "PREPROD1-USE1"
+    #- AMI == "RHEL7-Previous-Month"
+
+#- set_fact:
+    #AMI: "{{ RH7_DR_PrevM }}"
+  #when:
+    #- ENVIRONMENT == "DR-USW2"
+    #- AMI == "RHEL7-Previous-Month"
+
+#- set_fact:
+    #AMI: "{{ RH7_DR2_PrevM }}"
+  #when:
+    #- ENVIRONMENT == "DR2-USW2"
+    #- AMI == "RHEL7-Previous-Month"
+
+#- set_fact:
+    #AMI: "{{ RH7_IE_PROD_PrevM }}"
+  #when:
+    #- ENVIRONMENT == "PROD-EUW1"
+    #- AMI == "RHEL7-Previous-Month"
+
+- set_fact:
+     IAMI: "{{ RH7_OR_NonProd_PrevM }}"
+  when:
+     - ENVIRONMENT == "QA-USW2" or  ENVIRONMENT == 'QA1-USW2' or ENVIRONMENT == 'QA2-USW2' or ENVIRONMENT == 'PRODFIX-USW2' or
+       ENVIRONMENT == "DEV-USW2" or ENVIRONMENT == 'DEV1-USW2' or ENVIRONMENT == 'DEV2-USW2' or
+       ENVIRONMENT == "UAT-USW2"
+     - AMI == "RHEL7-Previous-Month"
+
+
+####RHEL8 Current Month AMI Selection based on Environment and User AMI Parameter Input
+
+- set_fact:
+    IAMI: "{{ RH8_VA_NonProd_Current }}"
+  when:
+    - ENVIRONMENT == "DEV-USE1" or ENVIRONMENT == 'DEV1-USE1' or ENVIRONMENT == 'DEV2-USE1' or
+      ENVIRONMENT == "QA-USE1" or ENVIRONMENT == 'QA1-USE1' or ENVIRONMENT == 'QA2-USE1' or ENVIRONMENT == 'PRODFIX-USE1' or
+      ENVIRONMENT == "UAT-USE1" or ENVIRONMENT == 'QA-USW2'
+    - AMI == "RHEL8-Current"
+
+#- set_fact:
+    #AMI: "{{ RH8_PROD_Current }}"
+  #when:
+    #- ENVIRONMENT == "PROD-USE1" or ENVIRONMENT == "PREPROD-USE1" or ENVIRONMENT == "PREPROD-USW2" or ENVIRONMENT == "PREPROD1-USE1"
+    #- IAMI == "RHEL8-Current"
+    #- APP == "FIERCE" or APP == "FIERCE-Mongo-CNF" or APP == "FIERCE-Mongo-DBN" or APP == "FIERCE-Mongo-MMS" or APP == "FIERCE-Mongo-MMSDB" or APP == "FIERCE-Mongo-S"
+
+#- set_fact:
+    #AMI: "{{ RH8_DR_Current }}"
+  #when:
+    #- ENVIRONMENT == "DR-USW2"
+    #- IAMI == "RHEL8-Current"
+    #- APP == "FIERCE" or APP == "FIERCE-Mongo-CNF" or APP == "FIERCE-Mongo-DBN" or APP == "FIERCE-Mongo-MMS" or APP == "FIERCE-Mongo-MMSDB" or APP == "FIERCE-Mongo-S"
+
+#- set_fact:
+    #AMI: "{{ RH8_DR2_Current }}"
+  #when:
+    #- ENVIRONMENT == "DR2-USW2"
+    #- AMI == "RHEL8-Current"
+
+#- set_fact:
+    #AMI: "{{ RH8_IE_PROD_Current }}"
+  #when:
+    #- ENVIRONMENT == "PROD-EUW1"
+    #- IAMI == "RHEL8-Current"
+    #- APP == "FIERCE" or APP == "FIERCE-Mongo-CNF" or APP == "FIERCE-Mongo-DBN" or APP == "FIERCE-Mongo-MMS" or APP == "FIERCE-Mongo-MMSDB" or APP == "FIERCE-Mongo-S"
+  #ignore_errors: true
+
+- set_fact:
+     IAMI: "{{ RH8_OR_NonProd_Current }}"
+  when:
+     - ENVIRONMENT == "QA-USW2" or  ENVIRONMENT == 'QA1-USW2' or ENVIRONMENT == 'QA2-USW2' or ENVIRONMENT == 'PRODFIX-USW2' or
+       ENVIRONMENT == "DEV-USW2" or ENVIRONMENT == 'DEV1-USW2' or ENVIRONMENT == 'DEV2-USW2' or
+       ENVIRONMENT == "UAT-USW2"
+     - AMI == "RHEL8-Current"
+     
+     
+####RHEL8 Previous Month AMI Selection based on Environment and User AMI Parameter Input
+
+- set_fact:
+    IAMI: "{{ RH8_VA_NonProd_PrevM }}"
+  when:
+    - ENVIRONMENT == "DEV-USE1" or ENVIRONMENT == 'DEV1-USE1' or ENVIRONMENT == 'DEV2-USE1' or
+      ENVIRONMENT == "QA-USE1" or ENVIRONMENT == 'QA1-USE1' or ENVIRONMENT == 'QA2-USE1' or ENVIRONMENT == 'PRODFIX-USE1' or
+      ENVIRONMENT == "UAT-USE1" or ENVIRONMENT == 'QA-USW2'
+    - AMI == "RHEL8-Previous-Month"
+
+#- set_fact:
+    #AMI: "{{ RH8_PROD_PrevM }}"
+  #when:
+    #- ENVIRONMENT == "PROD-USE1" or ENVIRONMENT == "PREPROD-USE1" or ENVIRONMENT == "PREPROD-USW2" or ENVIRONMENT == "PREPROD1-USE1"
+    #- IAMI == "RHEL8-Previous-Month"
+    #- APP == "FIERCE" or APP == "FIERCE-Mongo-CNF" or APP == "FIERCE-Mongo-DBN" or APP == "FIERCE-Mongo-MMS" or APP == "FIERCE-Mongo-MMSDB" or APP == "FIERCE-Mongo-S"
+
+#- set_fact:
+    #AMI: "{{ RH8_DR_PrevM }}"
+  #when:
+    #- ENVIRONMENT == "DR-USW2"
+    #- IAMI == "RHEL8-Previous-Month"
+    #- APP == "FIERCE" or APP == "FIERCE-Mongo-CNF" or APP == "FIERCE-Mongo-DBN" or APP == "FIERCE-Mongo-MMS" or APP == "FIERCE-Mongo-MMSDB" or APP == "FIERCE-Mongo-S"
+
+#- set_fact:
+    #AMI: "{{ RH8_DR2_PrevM }}"
+  #when:
+    #- ENVIRONMENT == "DR2-USW2"
+    #- AMI == "RHEL8-Previous-Month"
+
+#- set_fact:
+    #AMI: "{{ RH8_IE_PROD_PrevM }}"
+  #when:
+    #- ENVIRONMENT == "PROD-EUW1"
+    #- AMI == "RHEL8-Previous-Month"
+
+- set_fact:
+     IAMI: "{{ RH8_OR_NonProd_PrevM }}"
+  when:
+     - ENVIRONMENT == "QA-USW2" or  ENVIRONMENT == 'QA1-USW2' or ENVIRONMENT == 'QA2-USW2' or ENVIRONMENT == 'PRODFIX-USW2' or
+       ENVIRONMENT == "DEV-USW2" or ENVIRONMENT == 'DEV1-USW2' or ENVIRONMENT == 'DEV2-USW2' or
+       ENVIRONMENT == "UAT-USW2"
+     - AMI == "RHEL8-Previous-Month"
+     
+     
+- name: IAMI is
+  debug: 
+    msg: "{{ IAMI }}"
+  when: 
+     - ENVIRONMENT == "DEV-USE1" or ENVIRONMENT == 'DEV1-USE1' or ENVIRONMENT == 'DEV2-USE1' or
+       ENVIRONMENT == "QA-USE1" or ENVIRONMENT == 'QA1-USE1' or ENVIRONMENT == 'QA2-USE1' or ENVIRONMENT == 'PRODFIX-USE1' or ENVIRONMENT == "UAT-USE1" or
+       ENVIRONMENT == "QA-USW2" or  ENVIRONMENT == 'QA1-USW2' or ENVIRONMENT == 'QA2-USW2' or ENVIRONMENT == 'PRODFIX-USW2' or ENVIRONMENT == "DEV-USW2" or ENVIRONMENT == 'DEV1-USW2' or ENVIRONMENT == 'DEV2-USW2' or ENVIRONMENT == "UAT-USW2"
+
+- name: AMI is
+  debug: 
+    msg: "{{ AMI }}"
+  when: 
+     - ENVIRONMENT == "PROD-USE1" or ENVIRONMENT == "PREPROD-USE1" or ENVIRONMENT == "PREPROD1-USE1" or ENVIRONMENT == "DR-USW2"
+  
+  
+- name: Create Instances for nonprod environments
+  ec2:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    group_id: "{{ SG }}"
+    #security_groups: "{{ SG }}"
+    #instance_ids: []
+    instance_type: "{{ EC2PARAMS.TYPE }}"
+    #image_id: "{{ AMI }}"
+    image: "{{ IAMI }}"
+    vpc_subnet_id: "{{ SUBNET }}"
+    instance_profile_name: "{{ IAMROLE }}"
+    #instance_role: "{{ IAMROLE }}"
+    region: "{{ REGION }}"
+    #zone: us-east-1b
+    #state: present
+    #tags:
+    instance_tags:
+        Name: "{{ TAGNAME }}"
+        Owner: "{{ TAGOWNER }}"
+        #Owner: INFRA
+        ServerRole: "{{ TAGROLE }}"
+        Datadog: "{{ DATADOG }}"
+        ApplicationType: "{{ TAGAPPTYPE }}"
+        BU: "DJI"
+        BuildDate: "{{ BDate }}"
+        BuildTime: "{{ BTime }}"
+        BuildNumber: "{{ BUILD_NUMBER }}"
+        AppName: "{{ ENVAPP }}"
+        #AppID: "EEA3AA80-35D5-4C84-8403-39761A7215B8"
+        Environment: "{{ ENVIRONMENTTAG }}" 
+        
+    #wait: yes
+    #wait_timeout: 10
+    #count: "{{ EC2PARAMS.COUNT }}"
+    volumes:
+        - device_name: /dev/sda1
+          volume_type: gp3
+          volume_size: "{{ EC2PARAMS.ROOTSIZE }}"
+          delete_on_termination: true
+          #encrypted: yes
+          #kms_key_id: "{{ EBS_KEY }}"
+          
+        #- device_name: /dev/sdb
+          #volume_type: gp2
+          #volume_size: "{{ EC2PARAMS.LAPPSSIZE }}"
+          #delete_on_termination: false
+          #encrypted: yes
+          #kms_key_id: "{{ EBS_KEY }}"
+
+        #- device_name: /dev/sdc
+          #volume_type: gp2
+          #volume_size: "{{ EC2PARAMS.SWAPSIZE }}"
+          #delete_on_termination: true
+          #encrypted: yes
+          #kms_key_id: "{{ EBS_KEY }}"
+          
+        #- device_name: "{{ ADDTL_DEV }}"
+          #volume_type: gp2
+          #volume_size: "{{ ADDTL_DEV_SIZE  }}"
+          #delete_on_termination: false
+          #encrypted: yes
+          #kms_key_id: "{{ EBS_KEY }}"
+        
+    user_data: "{{ USER_DATA }}"
+    termination_protection: yes
+    keypair: "{{ KEYPAIR }}"
+  when: 
+     - "ACTION != 'SKIP'"
+     - ENVIRONMENT == "DEV-USE1" or ENVIRONMENT == 'DEV1-USE1' or ENVIRONMENT == 'DEV2-USE1' or
+       ENVIRONMENT == "QA-USE1" or ENVIRONMENT == 'QA1-USE1' or ENVIRONMENT == 'QA2-USE1' or ENVIRONMENT == 'PRODFIX-USE1' or ENVIRONMENT == "UAT-USE1" or
+       ENVIRONMENT == "QA-USW2" or  ENVIRONMENT == 'QA1-USW2' or ENVIRONMENT == 'QA2-USW2' or ENVIRONMENT == 'PRODFIX-USW2' or ENVIRONMENT == "DEV-USW2" or ENVIRONMENT == 'DEV1-USW2' or ENVIRONMENT == 'DEV2-USW2' or ENVIRONMENT == "UAT-USW2"
+  register: aws_new_instance
+  #delegate_to: 10.164.240.224
+  
+  
+- set_fact: 
+    np_aws_new_instance: "{{ aws_new_instance }}"
+  when: aws_new_instance.changed == true
+  
+- name: Create Instances for PROD PREPROD DR Environments
+  ec2:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    group_id: "{{ SG }}"
+    #security_groups: "{{ SG }}"
+    #instance_ids: []
+    instance_type: "{{ EC2PARAMS.TYPE }}"
+    #image_id: "{{ AMI }}"
+    image: "{{ AMI }}"
+    vpc_subnet_id: "{{ SUBNET }}"
+    instance_profile_name: "{{ IAMROLE }}"
+    #instance_role: "{{ IAMROLE }}"
+    region: "{{ REGION }}"
+    #zone: us-east-1b
+    #state: present
+    #tags:
+    instance_tags:
+        Name: "{{ TAGNAME }}"
+        Owner: "{{ TAGOWNER }}"
+        #Owner: INFRA
+        ServerRole: "{{ TAGROLE }}"
+        Datadog: "{{ DATADOG }}"
+        ApplicationType: "{{ TAGAPPTYPE }}"
+        BU: "DJI"
+        BuildDate: "{{ BDate }}"
+        BuildTime: "{{ BTime }}"
+        BuildNumber: "{{ BUILD_NUMBER }}"
+        AppName: "{{ ENVAPP }}"
+        #AppID: "EEA3AA80-35D5-4C84-8403-39761A7215B8"
+        Environment: "{{ ENVIRONMENTTAG }}" 
+        
+    #wait: yes
+    #wait_timeout: 10
+    #count: "{{ EC2PARAMS.COUNT }}"
+    volumes:
+        - device_name: /dev/sda1
+          volume_type: gp3
+          volume_size: "{{ EC2PARAMS.ROOTSIZE }}"
+          delete_on_termination: true
+          #encrypted: yes
+          #kms_key_id: "{{ EBS_KEY }}"
+          
+        #- device_name: /dev/sdb
+          #volume_type: gp2
+          #volume_size: "{{ EC2PARAMS.LAPPSSIZE }}"
+          #delete_on_termination: false
+          #encrypted: yes
+          #kms_key_id: "{{ EBS_KEY }}"
+
+        #- device_name: /dev/sdc
+          #volume_type: gp2
+          #volume_size: "{{ EC2PARAMS.SWAPSIZE }}"
+          #delete_on_termination: true
+          #encrypted: yes
+          #kms_key_id: "{{ EBS_KEY }}"
+          
+        #- device_name: "{{ ADDTL_DEV }}"
+          #volume_type: gp2
+          #volume_size: "{{ ADDTL_DEV_SIZE  }}"
+          #delete_on_termination: false
+          #encrypted: yes
+          #kms_key_id: "{{ EBS_KEY }}"
+        
+    user_data: "{{ USER_DATA }}"
+    termination_protection: yes
+    keypair: "{{ KEYPAIR }}"
+  when:
+     - "ACTION != 'SKIP'"
+     - ENVIRONMENT == "PROD-USE1" or ENVIRONMENT == "PREPROD-USE1" or ENVIRONMENT == "PROD-EUW1" or ENVIRONMENT == "PREPROD1-USE1" or ENVIRONMENT == "PREPROD-USW2" or ENVIRONMENT == "DR-USW2"
+  register: aws_new_instance
+  #delegate_to: 10.164.240.224
+  
+- name: "debug of aws_new_instance.changed variable after higher environments ec2 module"
+  debug: 
+    msg: "{{ aws_new_instance.changed }}"
+  ignore_errors: true
+    
+- set_fact: 
+     aws_new_instance: "{{ np_aws_new_instance }}"
+  when: aws_new_instance.changed == false
+
+- name: Wait for SSH to come up
+  delegate_to: "{{ item.private_ip }}"
+  wait_for_connection:
+    delay: 60
+    timeout: 180
+  loop: "{{ aws_new_instance.instances }}"
+  when: "ACTION != 'SKIP'"
+  
+
+- name: "Create /dev/sdb volume and Encrypt with Infra KMS Key and Attach to Instance"
+  ec2_vol:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    instance: "{{ item.id }}"
+    region: "{{ REGION }}"
+    device_name: /dev/sdb
+    volume_type: gp2
+    volume_size: "{{ EC2PARAMS.LAPPSSIZE }}"
+    encrypted: yes
+    kms_key_id: "{{ EBS_KEY }}"
+    delete_on_termination: false
+  with_items: "{{ aws_new_instance.instances }}"
+  
+- name: "Create /dev/sdc and Encrypt with Infra KMS Key and Attach to Instance"
+  ec2_vol:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    instance: "{{ item.id }}"
+    region: "{{ REGION }}"
+    device_name: /dev/sdc
+    volume_type: gp2
+    volume_size: "{{ EC2PARAMS.SWAPSIZE }}"
+    encrypted: yes
+    kms_key_id: "{{ EBS_KEY }}"
+    delete_on_termination: true
+  with_items: "{{ aws_new_instance.instances }}"
+  
+- name: "Create ADDITIONAL VOL and Encrypt with Infra KMS Key and Attach to Instance"
+  ec2_vol:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    instance: "{{ item.id }}"
+    region: "{{ REGION }}"
+    device_name: "{{ ADDTL_DEV }}"
+    volume_type: gp2
+    volume_size: "{{ ADDTL_DEV_SIZE  }}"
+    encrypted: yes
+    kms_key_id: "{{ EBS_KEY }}"
+    delete_on_termination: false
+  with_items: "{{ aws_new_instance.instances }}"
+  when: (EC2PARAMS.ADDITIONAL_VOL is defined and EC2PARAMS.ADDITIONAL_VOL_SIZE is defined)
+
+
+- set_fact:
+    ipaddr: "{{ item.private_ip }}" 
+  loop: "{{ aws_new_instance.instances }}"
+  when: "ACTION != 'SKIP'"
+  
+- name: "Gathering the ec2 instances list based on the BuildNumber and the AppName"
+  ec2_instance_facts:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    region: "{{ REGION }}"
+    #region: "{{ var_dict['REGION'] }}"
+    filters:
+       "tag:BuildNumber": "{{ BUILD_NUMBER }}"
+       tag:AppName": "{{ ENVAPP }}"
+       #"tag:AppName": "{{ var_dict['ENVAPP'] }}"
+  register: ec2_instances
+  when: ipaddr == "" and  "ACTION != 'SKIP'"
+  
+- set_fact:
+    ipaddr: "{{ item.private_ip }}"
+  with_items: "{{ ec2_instances.instances}}"
+  when: ipaddr == "" and "ACTION != 'SKIP'"
+
+- name: " ipaddr debug info"
+  debug:
+    msg: "{{ ipaddr }}"
+  when: "ACTION != 'SKIP'"
+  
+- name: register output for ec2 instance creation 
+  debug:
+    msg: "{{ aws_new_instance.instances }}"
+  #with_items: "{{ aws_new_instance.instances }}"
+
+- name: Instance IPAddress 
+  debug:
+    msg: "{{ item.private_ip }}"
+  with_items: "{{ aws_new_instance.instances }}"
+  
+- name: Instance ID 
+  debug:
+    msg: "{{ item.id }}"
+  with_items: "{{ aws_new_instance.instances }}"
+  
+- name: "Add Dynamodb Entry number and app"
+  shell: /local/apps/infra/scripts/BuildScripts/UpdateBuildState.py AppName="{{ ENVAPP }}" BuildID="{{ BUILD_NUMBER }}" IP="{{ ipaddr }}" BuildDate="{{ BDate }}" BuildTime="{{ BTime }}" INST_ID="{{ item.id }}" ENVIRONMENTTAG="{{ ENVIRONMENTTAG }}" ENVIRONMENT="{{ EC2PARAMS.ENV }}" REGION="{{ REGION }}" IAMROLE="{{ IAMROLE }}"  KEYPAIR="{{ KEYPAIR }}" SG="{{ SG }}"  INST_TYPE="{{ EC2PARAMS.TYPE }}" ROOT_VOL="{{ EC2PARAMS.ROOTSIZE }}" ADDT_VOL="{{ EC2PARAMS.LAPPSSIZE }}" SWAP_VOL="{{ EC2PARAMS.SWAPSIZE }}"  SUBNETS="{{ SUBNETS }}" ASSUMEROLE="{{ ASSUMEROLE }}" DELEGATEHOST="{{ DELEGATEHOST }}" ENVAPP="{{ ENVAPP }}" BuildTriggerUserML="{{ BuildTUserML }}"
+  delegate_to: "{{ SCRIPTHOST }}"
+  with_items: "{{ aws_new_instance.instances }}"
+  #loop_control:
+    #loop_var: DYINST
+  when: "ACTION != 'SKIP' and BUILD_NUMBER is defined"
+  remote_user: infra
+  #when: BUILD_NUMBER is defined
+  #ignore_errors: yes
+
+- name: Set old Subnet
+  set_fact:
+    LASTSUBNET: ["{{ SUBNET }}"]
+  #when: "ACTION != 'SKIP'"
+  
+- name: LASTSUBNET after DynamoDB update
+  debug:
+    msg: "{{ LASTSUBNET }}"
+  ignore_errors: true
+  
+
+#- name: "Add Dynamodb Entry number for ELB"
+  #shell: /local/apps/infra/scripts/BuildScripts/UpdateBuildState.py AppName="{{ ENVAPP }}" BuildID="{{ BUILD_NUMBER }}" TG_PROTO="{{ EC2PARAMS.tg_proto }}" TG_PORT="{{ EC2PARAMS.tg_port }}" TG_VPC_ID="{{ EC2PARAMS.tg_vpc_id }}" TG_HEALTH_CHECK_PATH="{{ EC2PARAMS.tg_health_check_path }}" TG_HEALTH_CHECK_PROTO="{{ EC2PARAMS.tg_health_check_proto }}" TG_TARGETS_PORT="{{ EC2PARAMS.tg_targets_port }}" ELB_LISTNER_PROTO1="{{ EC2PARAMS.elb_listner_proto1 }}" ELB_LISTNER_PROTO2="{{ EC2PARAMS.elb_listner_proto2 }}" ELB_LISTNER_CERT_ARN="{{ EC2PARAMS.elb_listner_cert_arn }}" ELB_LISTNER_PORT_HTTPS="{{ EC2PARAMS.elb_listner_port_https }}"  ELB_LISTNER_PORT_HTTP="{{ EC2PARAMS.elb_listner_port_http }}" ROUTE53_ZONE="{{ EC2PARAMS.route53_zone }}" ROUTE53_RECORD="{{ EC2PARAMS.route53_record }}"  ELB="{{ EC2PARAMS.ELB}}" ALB_OWNER_TAG="{{ EC2PARAMS.alb_owner_tag }}"  ALB_APPID="{{ EC2PARAMS.alb_appid }}"  ALB_SERVERROLE="{{ EC2PARAMS.alb_serverrole }}" TG_HEALTHY_THRESHOLD="{{ EC2PARAMS.tg_healthy_threshold }}" TG_UNHEALTHY_THRESHOLD="{{ EC2PARAMS.tg_unhealthy_threshold }}"  TG_TIMEOUT="{{ EC2PARAMS.tg_timeout }}"  TG_INTERVAL="{{ EC2PARAMS.tg_interval }}" S3_BUCKET="{{ EC2PARAMS.s3_bucket }}" S3_PREFIX="{{ EC2PARAMS.s3_prefix }}" R53POLICY="{{ EC2PARAMS.R53policy }}" R53ENV="{{ EC2PARAMS.R53env }}" WEIGHT_VAL="{{ EC2PARAMS.weight_val }}" TARGETTYPE="{{ EC2PARAMS.TargetType }}"
+  #delegate_to: "{{ SCRIPTHOST }}"
+  #when: "ACTION != 'SKIP' and BUILD_NUMBER is defined and EC2PARAMS.ELB == 'yes'"
+  #remote_user: infra
+  ##ignore_errors: true
+  
+#- name: "Add Dynamodb entry for ASG"
+  #shell: /local/apps/infra/scripts/BuildScripts/UpdateBuildState.py AppName="{{ ENVAPP }}" BuildID="{{ BUILD_NUMBER }}" ASG_MIN="{{ EC2PARAMS.asg_min }}" ASG_MAX="{{ EC2PARAMS.asg_max }}" ASG_DESIRED_CAPACITY="{{ EC2PARAMS.asg_desired_capacity }}" alb_asg_owner_tag="{{ EC2PARAMS.alb_asg_owner_tag }}"  ALB_ASG_SERVERROLE="{{ EC2PARAMS.alb_asg_serverrole }}"  ALB_ASG_APPID="{{ EC2PARAMS.alb_asg_appid }}" ASG_SCALE_DOWN_THRESHOLD="{{ EC2PARAMS.asg_scale_down_threshold }}" ASG_SCALE_UP_THRESHOLD="{{ EC2PARAMS.asg_scale_up_threshold }}" ASG="{{ EC2PARAMS.ASG}}"
+  #delegate_to: "{{ SCRIPTHOST }}"
+  #when: "ACTION != 'SKIP' and BUILD_NUMBER is defined and EC2PARAMS.ASG == 'yes'"
+  #remote_user: infra
+  #ignore_errors: yes
+

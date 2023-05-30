@@ -1,0 +1,483 @@
+- set_fact:
+    ROLE: "{{ var_dict['ROLE'] }}"
+    
+- debug:
+    msg: "{{ ROLE }}"
+    
+- set_fact:
+    APP_FINAL: "{{ APP.split('-').0 }}"
+  #when: "'-' in APP"
+
+- debug:
+    msg: "{{ APP_FINAL }}"  
+  
+- debug:
+    msg: "{{ ENV }}"    
+
+- name: Getting Session of Assumed Role
+  sts_assume_role:
+    region: "{{ REG }}"
+    role_arn: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+    role_session_name: 'spdji-provision'
+   #delegate_to: "{{ DELEGATEHOST }}"
+  register: assumed_role
+
+- name: Get the current account identity information
+  aws_caller_info:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    region: "{{ REG }}"
+  register: account_info
+
+- debug: msg="{{ account_info.account }}"
+  register: account
+
+- name: Get Current Month AMI ID
+  shell: "/usr/local/bin/aws ec2 describe-images --owners 011275511485 --region {{REG}} --filters 'Name=tag:CorpAMI,Values=*{{OS}}*' 'Name=name,Values=*SPGi-WIN-2019_2023*' 'Name=state,Values=available' --output json | jq -r '.Images | sort_by(.CreationDate) | last(.[]).ImageId'"
+  register: CAMI
+  when: "'CurrentMonth' in AMI"
+    
+- set_fact:
+   FAMI: "{{ CAMI.stdout }}"
+  when:
+    - ENVIRONMENT == "PROD-USE1" or ENVIRONMENT == 'DR-USW2' or ENVIRONMENT == "DEV-USE1" or ENVIRONMENT == 'DEV-USW2' or ENVIRONMENT == "DEV2-USE1" or ENVIRONMENT == 'DEV2-USW2' or 
+      ENVIRONMENT == "QA-USE1" or ENVIRONMENT == 'QA-USW2' or ENVIRONMENT == "QA1-USE1" or ENVIRONMENT == 'QA1-USW2' or ENVIRONMENT == "QA2-USE1" or ENVIRONMENT == 'QA2-USW2' or
+      ENVIRONMENT == "UAT-USE1" or ENVIRONMENT == 'UAT-USW2' or ENVIRONMENT == 'UAT2-USE1' or ENVIRONMENT == 'UAT2-USW2' or ENVIRONMENT == 'PRODFIX-USE1' or ENVIRONMENT == 'PRODFIX-USW2'
+    - AMI == "WINDOWS19-CurrentMonth"
+    - "'CurrentMonth' in AMI"
+
+- name: Get Previous Month AMI ID
+  shell: "/usr/local/bin/aws ec2 describe-images --owners {{ account.msg }} --region {{REG}} --filters 'Name=tag:CorpAMI,Values=*{{OS}}*' 'Name=name,Values=*{{REGION}}*' 'Name=state,Values=available' --output json | jq -r '.Images | sort_by(.CreationDate)[-2].ImageId'"
+  register: PAMI
+  when: "'PreviousMonth' in AMI"
+
+- set_fact:
+    FAMI: "{{ PAMI.stdout }}"
+  when:
+    - ENVIRONMENT == "DEV-USE1" or ENVIRONMENT == 'DEV-USW2' or ENVIRONMENT == "DEV1-USE1" or ENVIRONMENT == 'DEV1-USW2' or ENVIRONMENT == "DEV2-USE1" or ENVIRONMENT == 'DEV2-USW2' or 
+      ENVIRONMENT == "QA-USE1" or ENVIRONMENT == 'QA-USW2' or ENVIRONMENT == "QA1-USE1" or ENVIRONMENT == 'QA1-USW2' or ENVIRONMENT == "QA2-USE1" or ENVIRONMENT == 'QA2-USW2' or
+      ENVIRONMENT == "UAT-USE1" or ENVIRONMENT == 'UAT-USW2' or ENVIRONMENT == 'UAT2-USE1' or ENVIRONMENT == 'UAT2-USW2' or ENVIRONMENT == 'PRODFIX-USE1' or ENVIRONMENT == 'PRODFIX-USW2'
+    - AMI == "RHEL7-PreviousMonth" or "RHEL8-PreviousMonth"
+    - "'PreviousMonth' in AMI"
+
+- debug:
+    msg: "{{FAMI}}"
+
+- name: Get VPC ID based on Environment "{{ ENV }}" in Region "{{ REG }}"
+  ec2_vpc_net_info:
+    region: "{{ REG }}"
+    filters:
+      "tag:Environment": "{{ ENV }}"
+  register: vpc_info
+
+- debug:
+    msg: "{{vpc_info.vpcs[0].vpc_id}}"
+
+- set_fact:
+    VPC: "{{vpc_info.vpcs[0].vpc_id}}"
+
+- name: Get Subnet ID based on Role "{{ROLE}}" associated with VPC "{{VPC}}" in Region "{{REG}}"
+  ec2_vpc_subnet_info:
+    region: "{{ REG }}"
+    filters:
+      vpc-id: "{{ VPC }}"
+      "tag:Reach": "private"
+      "tag:Environment": "{{ ENV }}"
+  register: subnet_info
+  when: ROLE == "APP"
+
+- set_fact:
+    SUBNETS: "{{ subnet_info.subnets|map(attribute='subnet_id')|list }}"
+  when:  ROLE == "APP"
+
+- name: Get Subnet ID based on Role "{{ROLE}}" associated with VPC "{{VPC}}" in Region "{{REG}}"
+  ec2_vpc_subnet_info:
+    region: "{{ REG }}"
+    filters:
+      vpc-id: "{{ VPC }}"
+      "tag:Reach": "private"
+      "tag:Environment": "{{ ENV }}"
+  register: subnet_info
+  when: ROLE == "DB" or ROLE == "MongoDB"
+
+- set_fact:
+    SUBNETS: "{{ subnet_info.subnets|map(attribute='subnet_id')|list }}"
+  when: ROLE == "DB" or ROLE == "MongoDB"
+
+#- set_fact:
+#    ASG: "{{ var_dict['SECURITYGROUPS'].split(',') }}"
+#  when: APP == "ARROW-SOLR" or APP == "ARROW-ZOOKEEPER" or APP == "FIERCE-Mongo-CNF" or APP == "FIERCE-Mongo-DBN" or APP == "FIERCE-Mongo-MMS" or APP == "FIERCE-Mongo-MMSDB" or APP == "FIERCE-Mongo-S" or APP == "IDS-APACHE" or APP == "IDS-TOMCAT" or APP == "IDS-CONFL-JAVA" or APP == "IDS-CONFL-APACH" or APP == "IDS-DOCKER"
+
+#- debug:
+#    msg: ASG 
+#  ignore_errors: true
+
+- name: Get Security Groups associated with "{{ APP }}"
+  ec2_group_info:
+    region: "{{ REG }}"
+    filters:
+      vpc-id: "{{ VPC }}"
+      #"tag:Environment": "{{ ENV }}"
+      "tag:Owner": "{{ APP_FINAL }}"
+      "tag:Usage": "{{ APP }}"
+  register: group_info
+
+- set_fact:
+    ASG: "{{group_info.security_groups|map(attribute='group_id')|list}}"
+    
+- debug:
+    msg: "{{ ASG }}"   
+
+- name: Get Security Groups associated with "{{APP_FINAL}}"
+  ec2_group_info:
+    region: "{{ REG }}"
+    filters:
+      vpc-id: "{{ VPC }}"
+      #"tag:Environment": "{{ ENV }}"
+      "tag:Owner": "{{ APP_FINAL }}"
+      "tag:Usage": "EC2"
+  register: group_info
+
+- set_fact:
+    APPSG: "{{group_info.security_groups|map(attribute='group_id')|list}}"
+
+- name: Get default secuirty groups for EC2 Insatance
+  ec2_group_info:
+    region: "{{ REG }}"
+    filters:
+      vpc-id: "{{ VPC }}"
+      #"tag:Environment": "{{ ENV }}"
+      "tag:Usage": "Default"
+  register: group_info
+
+- set_fact:
+    DSG: "{{group_info.security_groups|map(attribute='group_id')|list}}"
+    
+- name: Get default secuirty groups for ALB
+  ec2_group_info:
+    region: "{{ REG }}"
+    filters:
+      vpc-id: "{{ VPC }}"
+      "tag:Environment": "{{ ENV }}"
+      "tag:Owner": "{{ APP_FINAL }}"
+  register: group_info
+
+- set_fact:
+    ALBSG: "{{group_info.security_groups|map(attribute='group_id')|list}}"
+
+- set_fact:
+    SG: "{{ DSG }} + {{ APPSG }} + {{ ASG }} + {{ ALBSG }}"
+  when: ASG is defined
+  
+- set_fact:
+    SG: "{{ SG | unique }}"
+  when: ASG is defined
+
+- debug:
+    msg: "{{ SG }}"
+  when: ASG is defined
+
+- set_fact:
+    SG: "{{ DSG }} + {{ APPSG }}"
+  when: ASG is undefined
+    
+- debug:
+    msg: "{{ SG }}"
+  when: ASG is undefined
+  
+#- name: Sleep for a min
+#  pause:
+#    seconds: 60
+  
+# - name: Get EBS Key ID in "{{ REG }}"
+#   aws_kms_info:
+#     region: "{{ REG }}"
+#     filters:
+#       tag-key: Name
+#       tag-value: "{{ENV}}-EBS"
+#   register: kms_info
+
+# - set_fact:
+#     EBS_KEY: "{{kms_info['keys'][0].key_id}}"
+
+- name: Identify KMS Key ARN using Tags
+  shell: "/usr/local/bin/aws resourcegroupstaggingapi get-resources --region {{ REG }} --resource-type-filters kms --tag-filters Key=Environment,Values={{ ENV }} Key=Usage,Values=EBS --query ResourceTagMappingList[].ResourceARN --output text"
+  register: kms_arn
+
+- name: Get KMS Key ID based on ARN
+  shell: "/usr/local/bin/aws kms describe-key --region {{ REG }} --key-id {{ kms_arn.stdout }} --query KeyMetadata.KeyId --output text"
+  register: kms_key
+
+- debug:
+    msg: "{{ kms_key.stdout }}"
+
+- set_fact:
+    EBS_KEY: "{{ kms_key.stdout }}"
+    
+- name: EC2 Keypair Fetch
+  shell: /usr/local/bin/aws ec2 describe-key-pairs --region {{ REG }} --filters 'Name=tag:Environment,Values={{ ENV }}' 'Name=tag:UsedFor,Values=KEYPAIR' --query KeyPairs[].KeyName --output text
+  register: keypair
+
+- debug:
+    msg: "{{ keypair.stdout }}"
+
+- set_fact:
+    KEYPAIR: "{{ keypair.stdout }}"
+
+- set_fact:
+    IAMROLE: "{{ENV}}_EC2_Role"
+
+- name: Fetch IAM Role based on specific APPs
+  iam_role_info:
+     name: "{{ APP_FINAL }}-APP-EC2-ROLE-01"
+  register: iam_role
+  ignore_errors: yes
+
+- set_fact:
+    IAMROLE: "{{ iam_role.iam_roles[0].arn.split('/').1 }}"
+  when: iam_role != ""
+  ignore_errors: yes
+
+- set_fact:
+    ASSUMEROLE: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+    #KEYPAIR: "{{ENV}}_VPC_Key"
+    ROOTSIZE: '100'
+    LAPPSSIZE: '100'
+    SWAPSIZE: '1'
+    INSTANCETYPE: "{{ var_dict['InstanceType'] }}"    
+
+- set_fact:
+    SEQNUM: "{{ SEQNUM | int + 1 }}"
+  when: SEQNUM is defined
+
+- set_fact:
+    SEQNUM: 1
+  when: SEQNUM is undefined
+
+- set_fact:
+    TAGOWNERFL: "{{ APP | regex_replace('SPDJI','') }}"
+
+- set_fact:
+    TAGNAME: "{{ENVAPP}}-{{ ROLE }}-{{ BUILD_NUMBER }}-{{ SEQNUM }}"
+    TAGOWNER: "{{ APP_FINAL }}"
+    TAGROLE: "{{ ROLE }}"
+  register: tagname
+
+- set_fact:
+    TAGOWNER: INFRA
+  when: APP_FINAL == 'INFRATEST' or APP_FINAL == 'INFRATEST1' or APP_FINAL == 'INFRATEST2'
+  ignore_errors: yes
+
+- name: Tagging Data
+  debug:
+    msg: "{{ tagname }}"
+
+- set_fact:
+    KEYPAIR: 'DEV-USW2-VPC-01'
+  when: REG == 'us-west-2' and ENVIRONMENT == 'DEV-USW2'
+
+- set_fact:
+    IAMROLE: FIERCE-MONGO-EC2-ROLE-01
+  when:
+   - APP == "FIERCE-Mongo" or APP == "FIERCE-Mongo-DBN" or APP == "FIERCE-Mongo-MMS" or APP == "FIERCE-Mongo-MMSDB" or APP == "FIERCE-Mongo-S"
+  ignore_errors: yes
+
+
+- set_fact:
+    IAMROLE: 'QA_EC2_Role'
+  when: IAMROLE == ''
+  
+- debug:
+    msg: "{{ IAMROLE }}"
+  ignore_errors: yes  
+
+- set_fact:
+    USER_DATA: "{{ MONGO_USER_DATA }}"
+  when: APP == 'FIERCE-Mongo-CNF' or APP == 'FIERCE-Mongo-DBN' or APP == 'FIERCE-Mongo-MMS' or
+        APP == 'FIERCE-Mongo-MMSDB' or APP == 'FIERCE-Mongo-S'
+
+- set_fact:
+    USER_DATA: "{{ LOCAL_USER_DATA }}"
+  when: USER_DATA is undefined
+
+- debug:
+    msg: "{{ USER_DATA }}"  
+  
+- set_fact:
+     TechStack: "None"
+  when: TechStack is undefined
+  
+- debug:
+    msg: "{{ TechStack }}"  
+
+- set_fact:
+    DATADOG: "True"
+
+- set_fact:
+    ADDTL_DEV: /dev/null
+  when: var_dict['ADDITIONAL_VOL'] != 'YES'
+  ignore_errors: true
+
+- set_fact:
+    ADDTL_DEV: /dev/sdf
+  when: var_dict['ADDITIONAL_VOL'] == 'YES'
+  ignore_errors: true
+
+- set_fact:
+    ADDTL_DEV_SIZE: "{{ var_dict['ADDITIONAL_VOL_SIZE'] }}"
+  when: APP == 'FIERCE-Mongo-CNF' or APP == 'FIERCE-Mongo-DBN' or APP == 'FIERCE-Mongo-MMS' or
+        APP == 'FIERCE-Mongo-MMSDB' or APP == 'FIERCE-Mongo-S'    
+    
+- name: LASTSUBNET is undefined
+  set_fact:
+    LASTSUBNET: ['subnet']
+  when: LASTSUBNET is undefined or LASTSUBNET|length > SUBNETS|length
+
+- name: LASTSUBNET before subnet selection
+  debug:
+    msg: "{{ LASTSUBNET }}"
+  ignore_errors: true
+
+- name: Select Subnet
+  set_fact:
+    SUBNET: "{{ SUBNETS | difference(LASTSUBNET) | random }}"
+
+- ec2_instance_info:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    region: "{{ REG }}"
+    filters:
+      "tag:Name": "{{ TAGNAME }}"
+      "instance-state-name" : ['pending ','running','shutting-down','stopping','stopped']
+  delegate_to: localhost
+  register: ec2_info
+
+- debug:
+    msg: "{{ ec2_info }}"
+
+- set_fact:
+    ACTION: "SKIP"
+    SUBNET: "{{ ec2_info.instances[0].subnet_id }}"
+  when: (ec2_info.instances | length  > 0)
+
+- debug:
+    msg: "Instance TAGNAME {{ TAGNAME }} Already Exists"
+  when: (ec2_info.instances | length  > 0)
+
+- set_fact:
+    ACTION: "PROCEED"
+  when: (ec2_info.instances | length  <= 0 )
+
+- name: Setting build date variable
+  set_fact: BDate="{{lookup('pipe','date \"+%Y-%m-%d \"')}}"
+
+- name: Setting build time variable
+  set_fact: BTime="{{lookup('pipe','date \"+%H:%M:%S \"')}}"
+
+- name: Create Instances
+  ec2:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    group_id: "{{ SG }}"
+    instance_type: "{{ INSTANCETYPE }}"
+    image: "{{ FAMI }}"
+    vpc_subnet_id: "{{ SUBNET }}"
+    instance_profile_name: "{{ IAMROLE }}"
+    region: "{{ REG }}"
+    instance_tags:
+      Name: "{{ TAGNAME }}"
+      Owner: "{{ TAGOWNER }}"
+      #Owner: 'INFRA'
+      ServerRole: "{{ TAGROLE }}"
+      Datadog: "{{ DATADOG }}"
+      ApplicationType: "{{ APP }}"
+      BU: "DJI"
+      BuildDate: "{{ BDate }}"
+      BuildTime: "{{ BTime }}"
+      BuildNumber: "{{ BUILD_NUMBER }}"
+      AppName: "{{ ENVAPP }}"
+      #AppID: "EEA3AA80-35D5-4C84-8403-39761A7215B8"
+      Environment: "{{ ENV }}"
+      TechStack: "{{ TechStack }}"
+      RetentionPeriod: "Not Applicable"
+    wait: yes
+    volumes:
+      - device_name: /dev/sda1
+        volume_type: gp3
+        volume_size: "{{ ROOTSIZE }}"
+        delete_on_termination: true
+    wait_timeout: 300
+    user_data: "{{ LOCAL_WIN_USER_DATA }}"
+    termination_protection: yes
+    keypair: "{{ KEYPAIR }}"
+  when: "ACTION != 'SKIP'"
+  register: aws_new_instance
+
+- name: "Create /dev/sdb volume and Encrypt with Infra KMS Key and Attach to Instance"
+  amazon.aws.ec2_vol:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    instance: "{{ item.id }}"
+    region: "{{ REG }}"
+    device_name: /dev/sdb
+    volume_type: gp3
+    volume_size: "{{ LAPPSSIZE }}"
+    encrypted: yes
+    kms_key_id: "{{ EBS_KEY }}"
+    delete_on_termination: false
+  with_items: "{{ aws_new_instance.instances }}"
+  when: APP_FINAL != "AURA" and APP_FINAL != "T3" and APP_FINAL != "MDB" and APP_FINAL != "CIP" and APP_FINAL != "BLUEPRISM"
+
+
+- set_fact:
+    ipaddr: "{{ item.private_ip }}"
+  loop: "{{ aws_new_instance.instances }}"
+  when: "ACTION != 'SKIP'"
+
+- name: "Gathering the ec2 instances info using its instance id"
+  ec2_instance_info:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    region: "{{ REG }}"
+    instance_ids:
+      - "{{ item.id }}"
+  register: ec2_instances
+  with_items: "{{ aws_new_instance.instances }}"
+  when: ipaddr == "" and "ACTION != 'SKIP'"
+
+- set_fact:
+    ipaddr: "{{ item.private_ip_address }}"
+  with_items: "{{ ec2_instances.instances}}"
+  when: ipaddr == "" and "ACTION != 'SKIP'"
+
+- name: " ipaddr debug info"
+  debug:
+    msg: "{{ ipaddr }}"
+  when: "ACTION != 'SKIP'"
+
+- name: Instance ID
+  debug:
+    msg: "{{ item.id }}"
+  with_items: "{{ aws_new_instance.instances }}"
+  
+- name: "Add Dynamodb Entry number and app"
+  shell: /local/apps/infra/scripts/BuildScripts/UpdateBuildState.py AppName="{{ ENVAPP }}" BuildID="{{ BUILD_NUMBER }}" IP="{{ ipaddr }}" BuildDate="{{ BDate }}" BuildTime="{{ BTime }}" INST_ID="{{ item.id }}" ENVIRONMENT="{{ ENVIRONMENT }}" REGION="{{ REG }}" INST_TYPE="{{ INSTANCETYPE }}" SUBNETS="{{ SUBNETS }}" ASSUMEROLE="{{ ASSUMEROLE }}" DELEGATEHOST="{{ DELEGATEHOST }}" ENVAPP="{{ ENVAPP }}" BuildTriggerUserML="{{ BuildTUserML }}" OWNER="{{ TAGOWNER }}" ENV="{{ ENV }}"
+   #delegate_to: "{{ DELEGATEHOST }}"
+  with_items: "{{ aws_new_instance.instances }}"
+  when: "ACTION != 'SKIP' and BUILD_NUMBER is defined"
+   #remote_user: infra
+
+- name: Set old Subnet
+  set_fact:
+    LASTSUBNET: '{{ LASTSUBNET + [ SUBNET ] }} '
+
+- name: LASTSUBNET after DynamoDB update
+  debug:
+    msg: "{{ LASTSUBNET }}"
+  ignore_errors: true
+  

@@ -1,0 +1,440 @@
+---
+- set_fact:
+    rolearn: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+  when:
+    - ENV == 'DEV' or
+      ENV == 'QA' or
+      ENV == 'UAT'
+
+- set_fact:
+    rolearn: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+  when:
+    - ENV == 'PROD' or
+      ENV == 'PREPROD' or
+      ENV == 'DR'
+
+- debug:
+    msg: "{{ rolearn }}"
+
+- name: Getting Session of Assumed Role
+  sts_assume_role:
+    region: "{{ REG }}"
+    role_arn: "{{ rolearn }}"
+    role_session_name: 'spdji-provision'
+  #delegate_to: "{{ DELEGATEHOST }}"
+  register: assumed_role
+ 
+- name: Get VPC ID based on Environment "{{ ENV }}" in Region "{{ REG }}"
+  ec2_vpc_net_info:
+    region: "{{ REG }}"
+    filters:
+      "tag:Environment": "{{ ENV }}"
+  register: vpc_info
+
+- debug:
+    msg: "{{vpc_info.vpcs[0].vpc_id}}"
+
+- set_fact:
+    VPC: "{{vpc_info.vpcs[0].vpc_id}}"
+    
+- name: Get Subnet ID based on Role "{{ROLE}}" associated with VPC "{{VPC}}" in Region "{{REG}}"
+  ec2_vpc_subnet_info:
+    region: "{{ REG }}"
+    filters:
+      vpc-id: "{{ VPC }}"
+      "tag:Reach": "private"
+      "tag:Environment": "{{ ENV }}"
+  register: subnet_info
+  when: ROLE == "APP"
+
+- set_fact:
+    SUBNETS: "{{ subnet_info.subnets|map(attribute='subnet_id')|list }}"
+  when:  ROLE == "APP"
+
+- name: Get Subnet ID based on Role "{{ROLE}}" associated with VPC "{{VPC}}" in Region "{{REG}}"
+  ec2_vpc_subnet_info:
+    region: "{{ REG }}"
+    filters:
+      vpc-id: "{{ VPC }}"
+      "tag:Reach": "private"
+      "tag:Environment": "{{ ENV }}"
+  register: subnet_info
+  when: ROLE == "DB" or ROLE == "MongoDB"
+
+- set_fact:
+    SUBNETS: "{{ subnet_info.subnets|map(attribute='subnet_id')|list }}"
+  when: ROLE == "DB" or ROLE == "MongoDB"
+
+- name: Get Security Groups associated to Database Services
+  ec2_group_info:
+    region: "{{ REG }}"
+    filters:
+      vpc-id: "{{ VPC }}"
+      #"tag:Environment": "{{ ENV }}"
+      #"tag:Owner": "{{ APP_FINAL }}"
+      "tag:UsedFor": "DB"
+  register: group_info
+
+- set_fact:
+    ASG: "{{group_info.security_groups|map(attribute='group_id')|list}}"
+  ignore_errors: yes
+  
+- debug:
+    msg: "{{ ASG }}"   
+  ignore_errors: yes
+  
+- name: Get default secuirty groups for EC2 Insatance
+  ec2_group_info:
+    region: "{{ REG }}"
+    filters:
+      vpc-id: "{{ VPC }}"
+      #"tag:Environment": "{{ ENV }}"
+      "tag:Usage": "Default"
+  register: group_info
+
+- set_fact:
+    DSG: "{{group_info.security_groups|map(attribute='group_id')|list}}"
+
+- set_fact:
+    SG: "{{ DSG }} + {{ ASG }}"
+  when: ASG is defined
+
+- name: Identify KMS Key ARN using Tags
+  shell: "/usr/local/bin/aws resourcegroupstaggingapi get-resources --region {{ REG }} --resource-type-filters kms --tag-filters Key=Environment,Values={{ ENV }} Key=Usage,Values=EBS --query ResourceTagMappingList[].ResourceARN --output text"
+  register: kms_arn
+
+- name: Get KMS Key ID based on ARN
+  shell: "/usr/local/bin/aws kms describe-key --region {{ REG }} --key-id {{ kms_arn.stdout }} --query KeyMetadata.KeyId --output text"
+  register: kms_key
+
+- debug:
+    msg: "{{ kms_key.stdout }}"
+
+- set_fact:
+    EBS_KEY: "{{ kms_key.stdout }}"
+
+- set_fact:
+    IAMROLE: "{{ENV}}_EC2_Role"
+  when:
+    - ENV == 'DEV'
+      ENV == 'QA'
+      ENV == 'UAT'
+      
+- set_fact:
+    IAMROLE: "EC2_{{ ENV }}_Role"
+  when:
+    - ENV == 'PROD'
+      ENV == 'PREPROD'
+      ENV == 'DR'
+
+- name: Fetch IAM Role based on specific APPs
+  iam_role_info:
+     name: "{{ APP }}-DB-EC2-ROLE-01"
+  register: iam_role
+  ignore_errors: yes
+
+- set_fact:
+    IAMROLE: "{{ iam_role.iam_roles[0].arn.split('/').1 }}"
+  when: iam_role != ""
+  ignore_errors: yes
+
+- debug:
+    msg: "{{ IAMROLE }}"
+  ignore_errors: yes
+  
+- set_fact:
+    #ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    KEYPAIR: "{{ENV}}_VPC_Key"
+    ROOTSIZE: '100'
+    
+- set_fact:
+    KEYPAIR: 'DEV-USW2-VPC-01'
+  when:
+    - REG == 'us-west-2'
+    - ENV == 'DEV' or
+      ENV == 'QA' or
+      ENV == 'UAT'
+ 
+- set_fact:
+    KEYPAIR: 'PROD-VPC-INFRA'
+  when:
+    - REG == 'us-east-1'
+    - ENV == 'PROD' or
+      ENV == 'PREPROD'
+      
+- set_fact:
+    KEYPAIR: 'DR1-VPC-01'
+  when:
+    - REG == 'us-west-2'
+    - ENV == 'DR'
+    
+- set_fact:
+    KEYPAIR: 'DR-VPC-INFRA'
+  when:
+    - REG == 'us-west-2'
+    - ENV == 'DR2'
+    
+- set_fact: 
+    SEQNUM: "{{ SEQNUM | int + 1 }}"
+  when: SEQNUM is defined
+  
+- set_fact:
+    SEQNUM: 1
+  when: SEQNUM is undefined
+  
+- set_fact:
+    TAGOWNERFL: "{{ APP | regex_replace('SPDJI','') }}"
+
+
+- set_fact:
+    TAGNAME: "{{ENVAPP}}-{{ ROLE }}-{{ BUILD_NUMBER }}-{{ SEQNUM }}"
+    TAGOWNER: "{{ APP }}"
+    TAGROLE: "{{ ROLE }}"
+  register: tagname
+
+- name: "tagname"
+  debug:
+    msg: "{{ tagname }}"
+   
+- set_fact:
+    TAGOWNER: INFRA
+  when: APP == 'INFRATEST' or APP == 'INFRATEST1' or APP == 'INFRATEST2'
+  ignore_errors: yes
+
+- set_fact:
+     TechStack: "None"
+  when: TechStack is undefined
+  
+- debug:
+    msg: "{{ TechStack }}"  
+
+- set_fact:
+    DATADOG: "True"
+    
+- name: LASTSUBNET is undefined
+  set_fact:
+    LASTSUBNET: ['subnet']
+  when: LASTSUBNET is undefined or LASTSUBNET|length > SUBNETS|length
+
+- name: LASTSUBNET before subnet selection
+  debug:
+    msg: "{{ LASTSUBNET }}"
+  ignore_errors: true
+  
+- name: Select Subnet
+  set_fact:
+    SUBNET: "{{ SUBNETS | difference(LASTSUBNET) | random }}"
+
+- name: debug
+  debug: 
+    msg: "Sequence Number is {{ SEQNUM }}"
+
+  
+- ec2_instance_info:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    region: "{{ REGION }}"
+    filters:
+        "tag:Name": "{{ TAGNAME }}"
+        "instance-state-name" : ['pending ','running','shutting-down','stopping','stopped']
+  delegate_to: localhost
+  register: ec2_facts
+  #when: "ACTION != 'SKIP'"
+
+- debug:
+    msg: "{{ ec2_facts }}"
+
+- set_fact: 
+    ACTION: "SKIP"
+    SUBNET: "{{ ec2_facts.instances[0].subnet_id }}" 
+  when: (ec2_facts.instances | length  > 0)
+
+- debug:
+    msg: "Instance {{ TAGNAME }} Already Exists"
+  when: (ec2_facts.instances | length  > 0)
+  
+- set_fact: 
+    ACTION: "PROCEED"  
+  when: (ec2_facts.instances | length  <= 0 )
+
+- set_fact:
+    TAGOWNER: INFRA
+  when: APP == 'INFRATEST'
+  ignore_errors: yes 
+  
+- name: Setting build date variable 
+  set_fact: BDate="{{lookup('pipe','date \"+%Y-%m-%d \"')}}"
+
+- name: Setting build time variable
+  set_fact: BTime="{{lookup('pipe','date \"+%H:%M:%S \"')}}"
+
+- name: Create Instances with Random AZ
+  ec2:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    group_id: "{{ SG }}"
+    instance_type: "{{INSTANCETYPE}}"
+    image: "{{ EC2AMI }}"
+    count: 1
+    vpc_subnet_id: "{{ SUBNET }}"
+    instance_profile_name: "{{ IAMROLE }}"
+    region: "{{ REG }}"
+    #tags:
+    instance_tags:
+        Name: "{{ TAGNAME }}"
+        Owner: "{{ TAGOWNER }}"
+        ServerRole: "{{ TAGROLE }}"
+        Datadog: "{{ DATADOG }}"
+        BU: "DJI"
+        BuildDate: "{{ BDate }}"
+        BuildTime: "{{ BTime }}"
+        BuildNumber: "{{ BUILD_NUMBER }}"
+        AppName: "{{ ENVAPP }}"
+        #AppID: "EEA3AA80-35D5-4C84-8403-39761A7215B8"
+        Environment: "{{ ENV }}" 
+        RetentionPeriod: "Not Applicable"
+    #user_data: "{{ USER_DATA }}"
+    termination_protection: yes
+    keypair: "{{ KEYPAIR }}"
+  when: AZ == "" and "ACTION != 'SKIP'"
+  register: aws_new_instance
+
+- debug:
+    msg: "{{aws_new_instance}}"
+
+- name: Wait for SSH to come up
+  delegate_to: "{{ item.private_ip }}"
+  wait_for_connection:
+    delay: 60
+    timeout: 180
+  loop: "{{ aws_new_instance.instances }}"
+  when: AZ == "" and "ACTION != 'SKIP'"
+
+- set_fact:
+    ipaddr: "{{ item.private_ip }}" 
+  loop: "{{ aws_new_instance.instances }}"
+  when: AZ == "" and "ACTION != 'SKIP'"
+  
+- name: register output for ec2 instance creation 
+  debug:
+    msg: "{{ aws_new_instance.instances }}"
+  when: AZ == ""
+  
+- name: Instance IPAddress 
+  debug:
+    msg: "{{ item.private_ip }}"
+  with_items: "{{ aws_new_instance.instances }}"
+  when: AZ == ""
+  
+- name: Instance ID 
+  debug:
+    msg: "{{ item.id }}"
+  with_items: "{{ aws_new_instance.instances }}"
+  when: AZ == ""
+
+- name: "Add Dynamodb Entry number and app"
+  shell: /local/apps/infra/scripts/BuildScripts/UpdateBuildState.py AppName="{{ ENVAPP }}" BuildID="{{ BUILD_NUMBER }}" IP="{{ ipaddr }}" BuildDate="{{ BDate }}" BuildTime="{{ BTime }}" INST_ID="{{ item.id }}" ENVIRONMENTTAG="{{ ENVIRONMENT }}" ENVIRONMENT="{{ ENV }}" REGION="{{ REG }}" IAMROLE="{{ IAMROLE }}"  KEYPAIR="{{ KEYPAIR }}" SG="{{ DSG }}"  INST_TYPE="{{ INSTANCETYPE }}" ROOT_VOL="{{ ROOTSIZE }}" SUBNETS="{{ SUBNETS }}" ASSUMEROLE="{{ ASSUMEROLE }}" DELEGATEHOST="{{ DELEGATEHOST }}" ENVAPP="{{ ENVAPP }}" BuildTriggerUserML="{{ BuildTUserML }}"
+  delegate_to: "{{ SCRIPTHOST }}"
+  with_items: "{{ aws_new_instance.instances }}"
+  when: AZ == "" and "ACTION != 'SKIP' and BUILD_NUMBER is defined "
+  remote_user: infra
+
+- name: Set old Subnet
+  set_fact:
+    LASTSUBNET: ["{{ SUBNET }}"]
+  #when: "ACTION != 'SKIP'"
+  
+- name: LASTSUBNET after DynamoDB update
+  debug:
+    msg: "{{ LASTSUBNET }}"
+  ignore_errors: true
+
+- name: Get Subnet Details
+  ec2_vpc_subnet_info:
+    region: "{{ REGION }}"
+    filters:
+      "tag:Reach": "private"
+      "tag:Environment": "{{ ENVIRONMENTTAG  }}"
+      "tag:Usage": "DB"
+      "tag:AZ": "{{ AZ }}"
+  when: AZ != ""
+  register: ec2_vpc_subnet_out
+
+- debug: 
+    msg: "{{ec2_vpc_subnet_out}}"
+  when: AZ != ""
+      
+- set_fact:
+    subnet_ids: "{{ ec2_vpc_subnet_out.subnets|map(attribute='id')|list }}"
+  when: AZ != ""
+  register: subnet_info
+
+- debug:
+    msg: "{{subnet_info}}"
+      
+- name: Create Instances based on AZ
+  ec2:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    group_id: "{{ SG }}"
+    instance_type: "{{ INSTANCETYPE }}"
+    image: "{{ EC2AMI }}"
+    count: 1
+    vpc_subnet_id: "{{ subnet_ids[0] }}"
+    #vpc_subnet_id: "subnet-0e50084b3f95eb986"
+    ec2_zone: "{{ AZ }}"
+    #ec2_zone: "us-west-2a"
+    instance_profile_name: "{{ IAMROLE }}"
+    region: "{{ REG }}"
+    #tags:
+    instance_tags:
+        Name: "{{ TAGNAME }}"
+        Owner: "{{ APP }}"
+        ServerRole: "{{ TAGROLE }}"
+        Datadog: "{{ DATADOG }}"
+        BU: "DJI"
+        BuildDate: "{{ BDate }}"
+        BuildTime: "{{ BTime }}"
+        BuildNumber: "{{ BUILD_NUMBER }}"
+        AppName: "{{ ENVAPP }}"
+        #AppID: "EEA3AA80-35D5-4C84-8403-39761A7215B8"
+        Environment: "{{ ENV }}"
+        RetentionPeriod: "Not Applicable"
+    termination_protection: yes
+    keypair: "{{ KEYPAIR }}"
+  #with_items: "{{ subnet_info.ansible_facts.subnet_ids }}"
+  when: AZ != "" and "ACTION != 'SKIP'"
+  register: aws_new_az_instance
+- name: print output
+  debug:
+   msg: "{{ aws_new_az_instance }}"
+
+- name: Wait for SSH to come up
+  delegate_to: "{{ item.instances[0].private_ip }}"
+  wait_for_connection:
+    delay: 60
+    timeout: 180
+  with_items: "{{ aws_new_az_instance.results }}"
+  when: AZ != "" and "ACTION != 'SKIP'"
+
+- set_fact:
+    ipaddr: "{{item.instances[0].private_ip }}" 
+  loop: "{{aws_new_az_instance.results }}"
+  when: AZ != "" and "ACTION != 'SKIP'"
+  
+- set_fact:
+    instID: "{{aws_new_inst_id.id }}" 
+  loop: "{{aws_new_az_instance.instances }}"
+  loop_control: 
+    loop_var: aws_new_inst_id
+  when: AZ != "" and "ACTION != 'SKIP'"
+
+- name: "Add Dynamodb Entry number and app"
+  shell: /local/apps/infra/scripts/BuildScripts/UpdateBuildState.py AppName="{{ ENVAPP }}" BuildID="{{ BUILD_NUMBER }}" IP="{{ ipaddr }}" BuildDate="{{ BDate }}" BuildTime="{{ BTime }}" INST_ID="{{ instID }}" ENVIRONMENTTAG="{{ ENVIRONMENT }}" ENVIRONMENT="{{ ENV }}" REGION="{{ REG }}" IAMROLE="{{ IAMROLE }}"  KEYPAIR="{{ KEYPAIR }}" SG="{{ DSG }}"  INST_TYPE="{{ INSTANCETYPE }}" ROOT_VOL="{{ ROOTSIZE }}" SUBNETS="{{ SUBNETS }}" ASSUMEROLE="{{ ASSUMEROLE }}" DELEGATEHOST="{{ DELEGATEHOST }}" ENVAPP="{{ ENVAPP }}" BuildTriggerUserML="{{ BuildTUserML }}"
+  delegate_to: "{{ SCRIPTHOST }}"
+  with_items: "{{ aws_new_az_instance.results }}"
+  when: AZ != "" and "ACTION != 'SKIP' and BUILD_NUMBER is defined"
+  remote_user: infra

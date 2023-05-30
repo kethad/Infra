@@ -1,0 +1,16 @@
+---
+- set_fact:
+    EC2_PARAMS: "{{ LOCAL_EC2_PARAMETERS }}"
+  when: EC2_PARAMS is undefined
+
+- include: create_instances.yml EC2PARAMS="{{ PARAS }}"
+  with_items: "{{ EC2_PARAMS }}"
+  loop_control:
+    loop_var: PARAS
+ 
+- name: Sync EBS Tags
+  shell: "{{ SYNTAGSCRIPT }}"
+  delegate_to: "{{ SCRIPTHOST }}"
+  remote_user: infra
+  become: false
+  ignore_errors: yes

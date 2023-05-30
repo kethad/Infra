@@ -1,0 +1,85 @@
+---
+- set_fact:
+    EC2_PARAMS: "{{ LOCAL_EC2_PARAMETERS }}"
+  when: EC2_PARAMS is undefined
+  
+- name: Retrieve Variable data from dynamodb
+  shell: /local/apps/infra/scripts/BuildScripts/RetrieveInstanceType.py {{ APP }} {{ ENVAPP }}
+  #delegate_to: "{{ DELEGATEHOST }}"
+  #remote_user: infra
+  register: BLDINFO
+  when: OS is defined and EC2AMI is undefined and Node is undefined
+  
+- set_fact:
+    var_dict: "{{ var_dict | default({}) | combine ({ item.split(': ')[0]: item.split(': ')[1]}) }}"
+  with_items: "{{ BLDINFO.stdout_lines }}"
+  when: OS is defined and EC2AMI is undefined and Node is undefined
+  
+- set_fact:
+    INS_COUNT: "{{ var_dict['Count'] }}"
+  when: OS is defined  and EC2AMI is undefined and Node is undefined
+
+- fail:
+    msg: "Please make sure AppName and Environment are valid"
+  when: BLDINFO.stdout_lines == [] and OS is defined and EC2AMI is undefined
+  ignore_errors: yes
+
+- include: create_instances_onejob.yml
+  with_sequence: count="{{ INS_COUNT | int }}"
+  when: OS is defined and EC2AMI is undefined and OS == "RHEL7" or OS == "RHEL8"
+  
+- include: create_instances_winonejob.yml
+  with_sequence: count="{{ INS_COUNT | int }}"
+  when: OS is defined and EC2AMI is undefined and OS == "WINDOWS19"  
+
+- include: create_instances.yml EC2PARAMS="{{ PARAS }}"
+  with_items: "{{ EC2_PARAMS }}"
+  loop_control:
+    loop_var: PARAS
+  when: CorpAMI is undefined and EC2AMI is undefined and Node is undefined and OS is undefined
+  
+# below task is specific to Jenkins Node automation
+- set_fact: 
+     EC2_PARAMS: "{{ EC2_PARAMS[0] }}"
+  when: Node is defined
+   
+# below task is specific to Jenkins Node automation
+- include: create_instances_jenkins_slave.yml EC2PARAMS="{{ EC2_PARAMS }}"
+  when: Node is defined
+
+- include: create_instances_corpami.yml EC2PARAMS="{{ PARAS }}"
+  with_items: "{{ EC2_PARAMS }}"
+  loop_control:
+    loop_var: PARAS
+  when: CorpAMI is defined
+
+- include: create_db_instances.yml
+  with_sequence: count="{{ INS_COUNT | int }}"
+  when: EC2AMI is defined and CorpAMI is undefined
+    
+- name: Sync EC2 other tags
+  shell: "{{ SYNTAGSCRIPT }}"
+  #delegate_to: "{{ SCRIPTHOST }}"
+  #remote_user: infra
+  become: false
+  ignore_errors: yes
+
+#- name: Retrieve ips from DynamoDB
+  #shell: /local/apps/infra/scripts/BuildScripts/RetrieveBuildInfo.py "{{ ENVAPP }}"  "{{ BUILD_NUMBER }}" INST_ID
+  #delegate_to: "{{ SCRIPTHOST }}"
+  #remote_user: infra
+  #register: inst_ids
+  #ignore_errors: true
+  
+#- name: Adding Tags to EC2 Instnaces Volumes
+  #shell: /local/apps/infra/scripts/SyncEBSTags/SyncEBSTags.py "{{ REGION }}" "{{ inst_ids.stdout }}"
+  #delegate_to: "{{ SCRIPTHOST }}"
+  #remote_user: infra
+  #ignore_errors: true
+
+#- name: Sync EBS Tags
+ # shell: "{{ SYNTAGSCRIPT }}"
+#  delegate_to: "{{ SCRIPTHOST }}"
+#  remote_user: infra
+#  become: false
+#  ignore_errors: yes

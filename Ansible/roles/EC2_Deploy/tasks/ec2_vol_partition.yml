@@ -1,0 +1,23 @@
+---
+- hosts: all
+  become: true
+  gather_facts: false
+   
+  tasks:
+    - name: Collect Disk Information 
+      setup:
+        gather_subset:
+          - hardware
+
+    - name: Print disks Details
+      debug:
+        var: hostvars[inventory_hostname].ansible_devices.keys()|list
+
+    - name: Create Partition
+      parted:
+        device: "/dev/{{ item }}"
+        number: 1
+        part_type: 'primary'
+        state: present
+      when: item != "nvme0n1" and item != "nvme1n1" and item != "nvme2n1" and item != "nvme3n1"
+      with_items: "{{ hostvars[inventory_hostname].ansible_devices.keys() | list }}"

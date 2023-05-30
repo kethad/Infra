@@ -1,0 +1,496 @@
+---
+- debug:
+    msg: "{{ EC2PARAMS }}"
+
+- fail: 
+    msg: "Wrong ROLE mentioned. ROLE should be one of these {{ ALLOWEDROLES }}"
+  when: EC2PARAMS.ROLE not in ALLOWEDROLES
+  
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-3e24bf58
+    SUBNETS: ['subnet-894214a4','subnet-19cd2f52','subnet-22b76e46','subnet-58df9203']
+    DSG: ['sg-4615483a','sg-9581a6e1']
+    IAMROLE: DEV_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    AMI: "{{ NONPRODAMI }}"
+    EBS_KEY: '12739c25-6a4d-4a8e-8557-a9162d0fc7ce'
+    KEYPAIR: 'DEV_VPC_Key'
+  when: EC2PARAMS.ENV == "DEV" and EC2PARAMS.ROLE not in DBGROUP
+  
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-3e24bf58
+    SUBNETS: ['subnet-5fdf9204','subnet-1fb36a7b','subnet-d2cc2e99','subnet-814214ac']
+    DSG: ['sg-4615483a','sg-9581a6e1']
+    IAMROLE: DEV_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    AMI: "{{ NONPRODAMI }}"
+    KEYPAIR: 'DEV_VPC_Key'
+    EBS_KEY: '12739c25-6a4d-4a8e-8557-a9162d0fc7ce'
+  when: EC2PARAMS.ENV == "DEV" and EC2PARAMS.ROLE in DBGROUP
+
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-d65377b0
+    SUBNETS: ['subnet-8de7a2e8','subnet-f68380db','subnet-eef3a3e2','subnet-7910ef46','subnet-1e182645','subnet-f57391be']
+    DSG: ['sg-e463df9b','sg-e1c1e095']
+    IAMROLE: QA_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    AMI: "{{ NONPRODAMI }}"
+    EBS_KEY: 'bb799a3e-3f25-4f88-8427-e760fb7dae39'
+    KEYPAIR: 'DEV_VPC_Key'
+  when: EC2PARAMS.ENV == "QA" and EC2PARAMS.ROLE not in DBGROUP
+  
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-d65377b0
+    SUBNETS: ['subnet-d6f8fbfb','subnet-7e1b2525','subnet-d8789a93','subnet-93da9ff6','subnet-980bf4a7','subnet-15f3a319']
+    DSG: ['sg-e463df9b','sg-e1c1e095']
+    IAMROLE: QA_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    AMI: "{{ NONPRODAMI }}"
+    EBS_KEY: 'bb799a3e-3f25-4f88-8427-e760fb7dae39'
+    KEYPAIR: 'DEV_VPC_Key'
+  when: EC2PARAMS.ENV == "QA" and EC2PARAMS.ROLE in DBGROUP
+
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-c597a5bd
+    SUBNETS: ['subnet-da2eb3f5','subnet-cf7aeb92']
+    DSG: ['sg-7db34234','sg-a887a0dc']
+    IAMROLE: QA_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    AMI: "{{ NONPRODAMI }}"
+    EBS_KEY: '276ead8e-2253-4a04-99c1-25d6e812a128'
+    KEYPAIR: 'DEV_VPC_Key'
+  when: EC2PARAMS.ENV == "UAT" and EC2PARAMS.ROLE not in DBGROUP
+
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-c597a5bd
+    SUBNETS: ['subnet-5a7bea07','subnet-e824b9c7']
+    DSG: ['sg-7db34234','sg-a887a0dc']
+    IAMROLE: QA_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    AMI: "{{ NONPRODAMI }}"
+    EBS_KEY: '276ead8e-2253-4a04-99c1-25d6e812a128'
+    KEYPAIR: 'DEV_VPC_Key'
+  when: EC2PARAMS.ENV == "UAT" and EC2PARAMS.ROLE in DBGROUP
+
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-9f4172e7
+    SUBNETS: ['subnet-68158747','subnet-82af39df']
+    DSG: ['sg-0d91fcd9291496063','sg-8286a1f6']
+    IAMROLE: QA_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    AMI: "{{ NONPRODAMI }}"
+    EBS_KEY: '276ead8e-2253-4a04-99c1-25d6e812a128'
+    KEYPAIR: 'DEV_VPC_Key'
+  when: EC2PARAMS.ENV == "STG" and EC2PARAMS.ROLE not in DBGROUP
+
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-9f4172e7
+    SUBNETS: ['subnet-e21d8fcd','subnet-f0ae38ad']
+    DSG: ['sg-0d91fcd9291496063','sg-8286a1f6']
+    IAMROLE: QA_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    AMI: "{{ NONPRODAMI }}"
+    EBS_KEY: '276ead8e-2253-4a04-99c1-25d6e812a128'
+    KEYPAIR: 'DEV_VPC_Key'
+  when: EC2PARAMS.ENV == "STG" and EC2PARAMS.ROLE in DBGROUP
+
+
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-1c5ec57a
+    SUBNETS: ['subnet-e64245af','subnet-1579344e','subnet-82e4b3af']
+    DSG: ['sg-db0d50a7','sg-d39eb9a7']
+    IAMROLE: EC2_PROD_Role
+    ASSUMEROLE: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+    SCRIPTHOST: "{{ PRODSCRIPTHOST }}"
+    AMI: "{{ PRODAMI }}"
+    EBS_KEY: 'e451ee73-f369-419f-b258-1fd3fe58adb3'
+    KEYPAIR: 'PROD-VPC-INFRA'
+  when: EC2PARAMS.ENV == "PROD" and EC2PARAMS.ROLE not in DBGROUP
+
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-1c5ec57a
+    SUBNETS: ['subnet-86e4b3ab','subnet-e44245ad','subnet-1179344a']
+    DSG: ['sg-db0d50a7','sg-d39eb9a7']
+    IAMROLE: EC2_PROD_Role
+    ASSUMEROLE: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+    SCRIPTHOST: "{{ PRODSCRIPTHOST }}"
+    AMI: "{{ PRODAMI }}"
+    EBS_KEY: 'e451ee73-f369-419f-b258-1fd3fe58adb3'
+    KEYPAIR: 'PROD-VPC-INFRA'
+  when: EC2PARAMS.ENV == "PROD" and EC2PARAMS.ROLE in DBGROUP
+
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-1c5ec57a
+    SUBNETS: ['subnet-e64245af','subnet-1579344e','subnet-82e4b3af']
+    DSG: ['sg-db0d50a7','sg-d39eb9a7']
+    IAMROLE: EC2_PROD_Role
+    ASSUMEROLE: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+    SCRIPTHOST: "{{ PRODSCRIPTHOST }}"
+    AMI: "{{ PRODAMI }}"
+    EBS_KEY: 'e451ee73-f369-419f-b258-1fd3fe58adb3'
+    KEYPAIR: 'PROD-VPC-INFRA'
+  when: EC2PARAMS.ENV == "SPRT" and EC2PARAMS.ROLE not in DBGROUP
+
+- set_fact:
+    REGION: us-east-1
+    VPCID: vpc-1c5ec57a
+    SUBNETS: ['subnet-86e4b3ab','subnet-e44245ad','subnet-1179344a']
+    DSG: ['sg-db0d50a7','sg-d39eb9a7']
+    IAMROLE: EC2_PROD_Role
+    ASSUMEROLE: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+    SCRIPTHOST: "{{ PRODSCRIPTHOST }}"
+    AMI: "{{ PRODAMI }}"
+    EBS_KEY: 'e451ee73-f369-419f-b258-1fd3fe58adb3'
+    KEYPAIR: 'PROD-VPC-INFRA'
+  when: EC2PARAMS.ENV == "SPRT" and EC2PARAMS.ROLE in DBGROUP
+  
+- set_fact:
+    REGION: us-west-2
+    VPCID: vpc-4092e927
+    SUBNETS: ['subnet-9e7c75c6','subnet-c67bd18f','subnet-674ede00']
+    DSG: ['sg-ce6e80b5','sg-5a988d26']
+    IAMROLE: EC2_DR_Role
+    ASSUMEROLE: 'arn:aws:iam::210265922058:role/DR-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DRSCRIPTHOST }}"
+    AMI: "{{ DRAMI }}"
+    EBS_KEY: 'c26c7eed-ba05-46d4-99c9-14477cd7a33d'
+    KEYPAIR: 'DR-VPC-INFRA'
+  when: EC2PARAMS.ENV == "DR" and EC2PARAMS.ROLE not in DBGROUP
+
+- set_fact:
+    REGION: us-west-2
+    VPCID: vpc-4092e927
+    SUBNETS: ['subnet-c57bd18c','subnet-664ede01','subnet-9c7c75c4']
+    DSG: ['sg-ce6e80b5','sg-5a988d26']
+    IAMROLE: EC2_DR_Role
+    ASSUMEROLE: 'arn:aws:iam::210265922058:role/DR-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DRSCRIPTHOST }}"
+    AMI: "{{ DRAMI }}"
+    EBS_KEY: 'c26c7eed-ba05-46d4-99c9-14477cd7a33d'
+    KEYPAIR: 'DR-VPC-INFRA'
+  when: EC2PARAMS.ENV == "DR" and EC2PARAMS.ROLE in DBGROUP
+  
+- set_fact:
+    TAGOWNERFL: "{{ EC2PARAMS.PLATFORM | regex_replace('SPDJI','') }}"
+    
+- set_fact:
+    TAGAPPTYPE: "{{ EC2PARAMS.ENV }}-SPDJI-{{ TAGOWNERFL }}-{{ EC2PARAMS.APP }}-{{ EC2PARAMS.SUBROLE }}"
+  when: ( EC2PARAMS.APP != '' and EC2PARAMS.APP !=  EC2PARAMS.PLATFORM ) and EC2PARAMS.SUBROLE != ''
+- set_fact:
+    TAGAPPTYPE: "{{ EC2PARAMS.ENV }}-SPDJI-{{ TAGOWNERFL }}-{{ EC2PARAMS.APP }}"
+  when: ( EC2PARAMS.APP != '' and EC2PARAMS.APP !=  EC2PARAMS.PLATFORM ) and EC2PARAMS.SUBROLE == ''
+- set_fact:
+    TAGAPPTYPE: "{{ EC2PARAMS.ENV }}-SPDJI-{{ TAGOWNERFL }}-{{ EC2PARAMS.SUBROLE }}"
+  when: ( EC2PARAMS.APP != '' and EC2PARAMS.APP ==  EC2PARAMS.PLATFORM  ) and EC2PARAMS.SUBROLE != ''
+- set_fact:
+    TAGAPPTYPE: "{{ EC2PARAMS.ENV }}-SPDJI-{{ TAGOWNERFL }}"
+  when: ( EC2PARAMS.APP != '' and EC2PARAMS.APP ==  EC2PARAMS.PLATFORM  ) and EC2PARAMS.SUBROLE == ''  
+- set_fact:
+    TAGAPPTYPE: "{{ EC2PARAMS.ENV }}-SPDJI-{{ TAGOWNERFL }}"
+  when: EC2PARAMS.APP == '' and EC2PARAMS.SUBROLE == ''
+  
+- set_fact:
+    TAGAPPTYPE: "{{ EC2PARAMS.ENV }}-SPDJI-{{ TAGOWNERFL }}-{{ EC2PARAMS.SUBROLE }}"
+  when: EC2PARAMS.APP == '' and EC2PARAMS.SUBROLE != ''  
+
+- set_fact:
+    TAGNAME: "{{ EC2PARAMS.ENV }}-{{ EC2PARAMS.PLATFORM }}-{{ EC2PARAMS.SEQ }}"
+    TAGOWNER: "{{ EC2PARAMS.PLATFORM }}"
+    TAGROLE: "{{ EC2PARAMS.ROLE }}"
+  when: EC2PARAMS.ROLE not in DBGROUP and ( EC2PARAMS.SUBROLE == '' and EC2PARAMS.APP == '' )
+  
+- set_fact:
+    TAGNAME: "{{ EC2PARAMS.ENV }}-{{ EC2PARAMS.PLATFORM }}-{{ EC2PARAMS.SUBROLE }}-{{ EC2PARAMS.SEQ }}"
+    TAGOWNER: "{{ EC2PARAMS.PLATFORM }}"
+    TAGROLE: "{{ EC2PARAMS.ROLE }}"
+  when: EC2PARAMS.ROLE not in DBGROUP and ( EC2PARAMS.SUBROLE != '' and EC2PARAMS.APP == '' )
+  
+- set_fact:
+    TAGNAME: "{{ EC2PARAMS.ENV }}-{{ EC2PARAMS.PLATFORM }}-{{ EC2PARAMS.APP }}-{{ EC2PARAMS.SUBROLE }}-{{ EC2PARAMS.SEQ }}"
+    TAGOWNER: "{{ EC2PARAMS.PLATFORM }}"
+    TAGROLE: "{{ EC2PARAMS.ROLE }}"
+  when: EC2PARAMS.ROLE not in DBGROUP and ( EC2PARAMS.SUBROLE != '' and EC2PARAMS.APP != '' )
+  
+- set_fact:
+    TAGNAME: "{{ EC2PARAMS.ENV }}-{{ EC2PARAMS.PLATFORM }}-{{ EC2PARAMS.APP }}-{{ EC2PARAMS.SEQ }}"
+    TAGOWNER: "{{ EC2PARAMS.PLATFORM }}"
+    TAGROLE: "{{ EC2PARAMS.ROLE }}"
+  when: EC2PARAMS.ROLE not in DBGROUP and ( EC2PARAMS.SUBROLE == '' and EC2PARAMS.APP != '' )
+  
+- set_fact:
+    TAGNAME: "{{ EC2PARAMS.ENV }}-{{ EC2PARAMS.PLATFORM }}-{{ EC2PARAMS.ROLE }}-{{ EC2PARAMS.SEQ }}"
+    TAGOWNER: "{{ EC2PARAMS.PLATFORM }}"
+    TAGROLE: "{{ EC2PARAMS.ROLE }}"
+  when: EC2PARAMS.ROLE in DBGROUP and ( EC2PARAMS.SUBROLE == '' and EC2PARAMS.APP == '' )
+  
+- set_fact:
+    TAGNAME: "{{ EC2PARAMS.ENV }}-{{ EC2PARAMS.PLATFORM }}-{{ EC2PARAMS.APP }}-{{ EC2PARAMS.ROLE }}-{{ EC2PARAMS.SUBROLE }}-{{ EC2PARAMS.SEQ }}"
+    TAGOWNER: "{{ EC2PARAMS.PLATFORM }}"
+    TAGROLE: "{{ EC2PARAMS.ROLE }}"
+  when: EC2PARAMS.ROLE in DBGROUP and ( EC2PARAMS.SUBROLE != '' and EC2PARAMS.APP != '' )
+  
+- set_fact:
+    TAGNAME: "{{ EC2PARAMS.ENV }}-{{ EC2PARAMS.PLATFORM }}-{{ EC2PARAMS.APP }}-{{ EC2PARAMS.ROLE }}-{{ EC2PARAMS.SEQ }}"
+    TAGOWNER: "{{ EC2PARAMS.PLATFORM }}"
+    TAGROLE: "{{ EC2PARAMS.ROLE }}"
+  when: EC2PARAMS.ROLE in DBGROUP and ( EC2PARAMS.SUBROLE == '' and EC2PARAMS.APP != '' )
+  
+#- set_fact:
+ #   APPSG: '[]'
+  #when: EC2PARAMS.APPSG is undefined or EC2PARAMS.APPSG == ''
+
+- set_fact:
+    APPSG: "{{ EC2PARAMS.APPSG }}"
+  when: EC2PARAMS.APPSG is defined
+
+- set_fact:
+    DATADOG: "{{ EC2PARAMS.DATADOG }}"
+  when: EC2PARAMS.DATADOG is defined
+  
+- set_fact:
+    DATADOG: "True"
+  when: (EC2PARAMS.DATADOG is undefined or EC2PARAMS.DATADOG == '')
+  
+- set_fact:
+    SG: "{{ DSG }} + {{ APPSG }}"
+  when: (APPSG is defined and APPSG != [''])
+
+- set_fact:
+    SG: "{{ DSG }}"
+  when: (APPSG is undefined or APPSG == [''])
+
+- set_fact:
+    ELB: "{{ EC2PARAMS.ELB }}"
+  when: EC2PARAMS.ELB is defined and EC2PARAMS.ELB != ''
+
+- set_fact:
+    ELB: "NOELB"
+  when: EC2PARAMS.ELB is undefined or EC2PARAMS.ELB == ''
+
+- debug:
+    msg: "{{ SG }}"
+  
+
+- set_fact:
+    USER_DATA: "{{ LOCAL_USER_DATA }}"
+  when: USER_DATA is undefined
+
+- set_fact:
+    ADDTL_DEV: /dev/null
+  when: (EC2PARAMS.ADDITIONAL_VOL is undefined or EC2PARAMS.ADDITIONAL_VOL != 'YES' )
+  
+- set_fact:
+    ADDTL_DEV: /dev/sdf
+  when: (EC2PARAMS.ADDITIONAL_VOL is defined and EC2PARAMS.ADDITIONAL_VOL == 'YES')
+
+- set_fact:
+    ADDTL_DEV_SIZE: "{{ EC2PARAMS.ADDITIONAL_VOL_SIZE  }}"
+  when: EC2PARAMS.ADDITIONAL_VOL_SIZE is defined
+
+- set_fact:
+    ADDTL_DEV_SIZE: '0'
+  when: EC2PARAMS.ADDITIONAL_VOL_SIZE is undefined
+  
+- name: LASTSUBNET is undefined
+  set_fact:
+    LASTSUBNET: ['subnet']
+  when: LASTSUBNET is undefined
+
+- name: Select Subnet
+  set_fact:
+    SUBNET: "{{ SUBNETS | difference(LASTSUBNET) | random }}"
+  
+  #until: SUBNET != LASTSUBNET
+  #retries: 999
+
+- name: Getting Session of Assumed Role
+  sts_assume_role:
+    region: "{{ REGION }}"
+    role_arn: "{{ ASSUMEROLE }}"
+    role_session_name: 'spdji-provision'
+  delegate_to: "{{ DELEGATEHOST }}"
+  register: assumed_role
+  #when: "ACTION != 'SKIP'"
+  
+- ec2_instance_facts:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    region: "{{ REGION }}"
+    filters:
+        "tag:Name": "{{ TAGNAME }}"
+        "instance-state-name" : ['pending ','running','shutting-down','stopping','stopped']
+  register: ec2_facts
+  #when: "ACTION != 'SKIP'"
+
+- debug:
+    msg: "{{ ec2_facts }}"
+
+#- ec2_eni_facts:
+ #   aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+  #  aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+   # security_token: "{{ assumed_role.sts_creds.session_token }}"
+    #region: "{{ REGION }}"
+    #filters:
+    #    addresses.private-ip-address: "{{ ec2_facts.instances[0].private_ip_address }}"
+  #register: meta_out
+  #when: (ec2_facts.instances | length  > 0)
+  
+#- debug:
+ #   msg: "{{ meta_out }}" 
+    
+#- shell: MAC=`curl http://169.254.169.254/latest/meta-data/network/interfaces/macs/ 2>/dev/null`;curl http://169.254.169.254/latest/meta-data/network/interfaces/macs/$MAC/subnet-id/
+ # delegate_to: "{{ ec2_facts.instances[0].private_ip_address}}"
+  #register: meta_out
+  #when: (ec2_facts.instances | length  > 0)
+
+- set_fact: 
+    ACTION: "SKIP"
+    #SUBNET: "{{ meta_out.interfaces[0].subnet_id }}" 
+    SUBNET: "{{ ec2_facts.instances[0].subnet_id }}" 
+  when: (ec2_facts.instances | length  > 0)
+
+- debug:
+    msg: "Instance {{ TAGNAME }} Already Exists"
+  when: (ec2_facts.instances | length  > 0)
+  
+- set_fact: 
+    ACTION: "PROCEED"  
+  when: (ec2_facts.instances | length  <= 0 )   
+  
+- name: Create Instances
+  ec2:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    group_id: "{{ SG }}"
+    #security_groups: "{{ SG }}"
+    #instance_ids: []
+    instance_type: "{{ EC2PARAMS.TYPE }}"
+    #image_id: "{{ AMI }}"
+    image: "{{ AMI }}"
+    vpc_subnet_id: "{{ SUBNET }}"
+    instance_profile_name: "{{ IAMROLE }}"
+    #instance_role: "{{ IAMROLE }}"
+    region: "{{ REGION }}"
+    #state: present
+    #tags:
+    instance_tags:
+        Name: "{{ TAGNAME }}"
+        Owner: "{{ TAGOWNER }}"
+        ServerRole: "{{ TAGROLE }}"
+        Datadog: "{{ DATADOG }}"
+        ApplicationType: "{{ TAGAPPTYPE }}"
+        BU: "DJI"
+    #wait: yes
+    #wait_timeout: 10
+    #count: "{{ EC2PARAMS.COUNT }}"
+    volumes:
+        - device_name: /dev/sda1
+          volume_type: gp2
+          volume_size: "{{ EC2PARAMS.ROOTSIZE }}"
+          delete_on_termination: true
+          #encrypted: yes
+          #kms_key_id: "{{ EBS_KEY }}"
+          
+        - device_name: /dev/sdb
+          volume_type: gp2
+          volume_size: "{{ EC2PARAMS.LAPPSSIZE }}"
+          delete_on_termination: false
+          encrypted: yes
+          kms_key_id: "{{ EBS_KEY }}"
+
+        - device_name: /dev/sdc
+          volume_type: gp2
+          volume_size: "{{ EC2PARAMS.SWAPSIZE }}"
+          delete_on_termination: true
+          encrypted: yes
+          kms_key_id: "{{ EBS_KEY }}"
+          
+        - device_name: "{{ ADDTL_DEV }}"
+          volume_type: gp2
+          volume_size: "{{ ADDTL_DEV_SIZE  }}"
+          delete_on_termination: false
+          encrypted: yes
+          kms_key_id: "{{ EBS_KEY }}"
+        
+    user_data: "{{ USER_DATA }}"
+    termination_protection: yes
+    keypair: "{{ KEYPAIR }}"
+  when: "ACTION != 'SKIP'"
+  register: aws_new_instance
+  #delegate_to: 10.164.240.224
+
+- name: Register Instance to ELB
+  ec2_elb:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    ec2_elbs: "{{ ELB }}"
+    instance_id: "{{ INSTANCE.id }}"
+    region: "{{ REGION }}"
+    state: present
+    wait: no
+    #wait_timeout: 45
+  when: "ELB != 'NOELB' and ACTION != 'SKIP'"
+  with_items: "{{ aws_new_instance.instances }}"
+  loop_control:
+    loop_var: INSTANCE
+  ignore_errors: yes
+  
+- name: Set old Subnet
+  set_fact:
+    LASTSUBNET: ["{{ SUBNET }}"]
+  #when: "ACTION != 'SKIP'"
+  
+  
+- debug:
+     msg: "{{ INST.private_ip }}"
+  with_items: "{{ aws_new_instance.instances }}"
+  loop_control:
+    loop_var: INST
+  when: "ACTION != 'SKIP'"
+
+#- name: "Add to Inventory"
+#  add_host:
+#    hostname: "{{ INVINST.private_ip }}"
+#    group: "{{ EC2PARAMS.ENV }}-{{ BUILD_NUMBER }}"
+#  with_items: "{{ aws_new_instance.instances }}"
+#  loop_control:
+#    loop_var: INVINST
+#  when: "ACTION != 'SKIP'"
+  
+- name: "Add to Inventory"
+  add_host:
+    name: "{{ INVINST.private_ip }}"
+    groups: "{{ EC2PARAMS.ENV }}-{{ BUILD_NUMBER }}"
+  with_items: "{{ aws_new_instance.instances }}"
+  loop_control:
+    loop_var: INVINST
+  when: "ACTION != 'SKIP'"
+
+- debug:
+     msg: "{{ DEBUGINST.private_ip }}"
+  with_items: "{{ aws_new_instance.instances }}"
+  loop_control:
+    loop_var: DEBUGINST
+  when: "ACTION != 'SKIP'"

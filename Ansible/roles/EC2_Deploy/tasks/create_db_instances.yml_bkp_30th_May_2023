@@ -1,0 +1,517 @@
+---
+
+- set_fact:
+    ENV: "{{ ENVIRONMENT }}"
+    PLATFORM: "{{ APP }}"
+    APP: "{{ APP }}"
+    ROLE: "{{ ROLE }}"
+    ROOTSIZE: '100'
+    REGION: us-east-1
+    AZ: "{{ AZ }}"
+    VPCID: vpc-3e24bf58
+    #SUBNETS: ['subnet-d2cc2e99','subnet-1fb36a7b','subnet-814214ac','subnet-5fdf9204']
+    SUBNETS: ['subnet-0c962b5fc388ac89f','subnet-0364670a8b958dffb','subnet-03d7f692b0d2ff199']
+    DSG: ['sg-03dec67f','sg-9452f1eb','sg-0fbe55cece5747d09','sg-0d75841d67bf9003b','sg-4615483a','sg-9581a6e1','sg-581c6827']
+    IAMROLE: DEV_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    KEYPAIR: 'DEV_VPC_Key'
+    EBS_KEY: '12739c25-6a4d-4a8e-8557-a9162d0fc7ce'
+    ENVIRONMENTTAG: "{{ ENVIRONMENTTAG }}"
+    BUILD_NUMBER: "{{ BUILD_NUMBER }}"
+  when: ENVIRONMENT == "DEV-USE1" or ENVIRONMENT == 'DEV1-USE1' or ENVIRONMENT == 'DEV2-USE1'
+  
+- set_fact:
+    ENV: "{{ ENVIRONMENT }}"
+    PLATFORM: "{{ APP }}"
+    APP: "{{ APP }}"
+    ROLE: "{{ ROLE }}"
+    ROOTSIZE: '100'
+    REGION: us-west-2
+    AZ: "{{ AZ }}"
+    VPCID: vpc-0b4dd997c1deb0ce7
+    #SUBNETS: ['subnet-04b88cb400a71b1e6','subnet-03cfb05029d8e983f','subnet-0e7eb762d492c4ac6']
+    SUBNETS: ['subnet-0006580f056f7c9c1','subnet-0a69318ff2dcb8f00','subnet-0324b7818e7a7369a']
+    DSG: ['sg-0bed36c5535dc3f16','sg-00bd30cd86a348b9a','sg-010189e936d471dce']
+    IAMROLE: DEV_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    KEYPAIR: 'DEV-USW2-VPC-01'
+    EBS_KEY: 'a8458e68-f4fd-41bc-9e33-ace1b8ffa74c'
+    ENVIRONMENTTAG: "{{ ENVIRONMENTTAG }}"
+    BUILD_NUMBER: "{{ BUILD_NUMBER }}"
+  when: ENVIRONMENT == "DEV-USW2" or ENVIRONMENT == 'DEV1-USW2' or ENVIRONMENT == 'DEV2-USW2'  
+
+- set_fact:
+    ENV: "{{ ENVIRONMENT }}"
+    PLATFORM: "{{ APP }}"
+    APP: "{{ APP }}"
+    ROLE: "{{ ROLE }}"
+    ROOTSIZE: '100'
+    INSTANCE_TYPE: "{{ INSTANCETYPE }}"
+    EC2AMI: "{{ EC2AMI }}"
+    REGION: us-east-1
+    VPCID: vpc-d65377b0
+    #SUBNETS: ['subnet-d6f8fbfb','subnet-7e1b2525','subnet-d8789a93','subnet-93da9ff6','subnet-980bf4a7','subnet-15f3a319']
+    SUBNETS: ['subnet-0032102366e3a81bc','subnet-0cce45b6802227721','subnet-0152bf71d9e8c401c']
+    DSG: ['sg-0041ad71','sg-63945f12','sg-a5da35d4','sg-0d1ae608d5cab8aae','sg-e1c1e095']
+    IAMROLE: QA_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    KEYPAIR: 'QA_VPC_Key'
+    EBS_KEY: '12739c25-6a4d-4a8e-8557-a9162d0fc7ce'
+    ENVIRONMENTTAG: "{{ ENVIRONMENTTAG }}"
+    BUILD_NUMBER: "{{ BUILD_NUMBER }}"
+  when: ENVIRONMENT == "QA-USE1" or ENVIRONMENT == 'QA1-USE1' or ENVIRONMENT == 'QA2-USE1' or ENVIRONMENT == 'PRODFIX-USE1'
+
+- set_fact:
+    ENV: "{{ ENVIRONMENT }}"
+    PLATFORM: "{{ APP }}"
+    APP: "{{ APP }}"
+    ROLE: "{{ ROLE }}"
+    ROOTSIZE: '100'
+    INSTANCE_TYPE: "{{ INSTANCETYPE }}"
+    EC2AMI: "{{ EC2AMI }}"
+    REGION: us-east-1
+    VPCID: vpc-c597a5bd
+    #SUBNETS: ['subnet-5a7bea07','subnet-e824b9c7']
+    SUBNETS: ['subnet-0c29fa2217cdcf6b2','subnet-09a3bea4888a9d1f6','subnet-0b0dc0e67bcb24d61']
+    DSG: ['sg-a887a0dc','sg-041e0c02bc8d586da','sg-090b985eb4886b9b4','sg-8b5553fd','sg-0865927bf59281a19']
+    IAMROLE: QA_EC2_Role
+    ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DEVSCRIPTHOST }}"
+    KEYPAIR: 'DEV_VPC_Key'
+    EBS_KEY: '12739c25-6a4d-4a8e-8557-a9162d0fc7ce'
+    ENVIRONMENTTAG: "{{ ENVIRONMENTTAG }}"
+    BUILD_NUMBER: "{{ BUILD_NUMBER }}"
+  when: ENVIRONMENT == "UAT-USE1"
+
+- set_fact:
+    ENV: "{{ ENVIRONMENT }}"
+    PLATFORM: "{{ APP }}"
+    APP: "{{ APP }}"
+    ROLE: "{{ ROLE }}"
+    ROOTSIZE: '100'
+    INSTANCE_TYPE: "{{ INSTANCETYPE }}"
+    EC2AMI: "{{ EC2AMI }}"
+    REGION: us-east-1
+    VPCID: vpc-057a7683cf77f5bef
+    #SUBNETS: ['subnet-0538112afffd9202f','subnet-0dee3b83ebb486c19','subnet-035b1e3d366957308']
+    SUBNETS: ['subnet-0ff1890fcde70613c','subnet-099bdbd84b7cead5d','subnet-0f0a2ea5039015542']
+    DSG: ['sg-0e5a7137dd4c093e1','sg-09fbdfc5b5d2be9fd','sg-0843ffdbe348ea853','sg-0daee84752318650c','sg-0c6525a19d191b59d']
+    IAMROLE: EC2_PREPROD_Role
+    ASSUMEROLE: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+    SCRIPTHOST: "{{ PRODSCRIPTHOST }}"
+    KEYPAIR: 'PROD-VPC-INFRA'
+    EBS_KEY: 'e451ee73-f369-419f-b258-1fd3fe58adb3'
+    ENVIRONMENTTAG: "{{ ENVIRONMENTTAG }}"
+    BUILD_NUMBER: "{{ BUILD_NUMBER }}"
+  when: ENVIRONMENT == "PREPROD-USE1"
+  
+- set_fact:
+    ENV: "{{ ENVIRONMENT }}"
+    PLATFORM: "{{ APP }}"
+    APP: "{{ APP }}"
+    ROLE: "{{ ROLE }}"
+    ROOTSIZE: '100'
+    INSTANCE_TYPE: "{{ INSTANCETYPE }}"
+    EC2AMI: "{{ EC2AMI }}"
+    REGION: us-east-1
+    VPCID: vpc-1c5ec57a
+    #SUBNETS: ['subnet-0acb5d243533f32a7','subnet-03a9d1b50ad722dc9','subnet-86e4b3ab']
+    SUBNETS: ['subnet-00a38c875a41cf80b','subnet-0ea6898db253966d4','subnet-0872e670bc1e34fcc']
+    DSG: ['sg-db0d50a7','sg-d39eb9a7']
+    IAMROLE: EC2_PROD_Role
+    ASSUMEROLE: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+    SCRIPTHOST: "{{ PRODSCRIPTHOST }}"
+    KEYPAIR: 'PROD-VPC-INFRA'
+    EBS_KEY: 'e451ee73-f369-419f-b258-1fd3fe58adb3'
+    ENVIRONMENTTAG: "{{ ENVIRONMENTTAG }}"
+    BUILD_NUMBER: "{{ BUILD_NUMBER }}"
+  when: ENVIRONMENT == "PROD-USE1"
+
+- set_fact:
+    ENV: "{{ ENVIRONMENT }}"
+    PLATFORM: "{{ APP }}"
+    APP: "{{ APP }}"
+    ROLE: "{{ ROLE }}"
+    ROOTSIZE: '100'
+    INSTANCE_TYPE: "{{ INSTANCETYPE }}"
+    EC2AMI: "{{ EC2AMI }}"
+    REGION: us-west-2
+    VPCID: vpc-0dac0071e5643ccb3
+    #SUBNETS: ['subnet-0e50084b3f95eb986','subnet-072c5ed567ef0f9a1','subnet-0fa46c0ba7bf9cfca']
+    SUBNETS: ['subnet-0e338579b87b5c18e','subnet-07c6fd25e9bbf36b8','subnet-03a1a32c2610429a4']
+    DSG: ['sg-003406ea6a81c0b66','sg-01ade5b2e2c442408']
+    IAMROLE: EC2_DR_Role
+    ASSUMEROLE: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+    SCRIPTHOST: "{{ PRODSCRIPTHOST }}"
+    KEYPAIR: 'DR1-VPC-01'
+    EBS_KEY: '5e13ad8c-8ef2-4e3b-a2b7-6154bd5f3604'
+    ENVIRONMENTTAG: "{{ ENVIRONMENTTAG }}"
+    BUILD_NUMBER: "{{ BUILD_NUMBER }}"
+  when: ENVIRONMENT == "DR-USW2"
+
+- set_fact:
+    ENV: "{{ ENVIRONMENT }}"
+    PLATFORM: "{{ APP }}"
+    APP: "{{ APP }}"
+    ROLE: "{{ ROLE }}"
+    ROOTSIZE: '100'
+    INSTANCE_TYPE: "{{ INSTANCETYPE }}"
+    EC2AMI: "{{ EC2AMI }}"
+    REGION: eu-west-1
+    VPCID: vpc-0aa0e31c576b3d955
+    SUBNETS: ['subnet-0758b001959751442','subnet-02c648726a01f7049','subnet-097278dcd5968b362']
+    DSG: ['sg-08232afb6226b14ad','sg-0f1ddfb94e9060781']
+    IAMROLE: EC2_DR_Role
+    ASSUMEROLE: 'arn:aws:iam::897860998156:role/PROD-EC2-SELFSERV'
+    SCRIPTHOST: "{{ DRSCRIPTHOST }}"
+    KEYPAIR: 'DR1-EUW2-EC2'
+    EBS_KEY: '2c487dbe-87d4-4ac4-a3c7-e741de9c6838'
+    ENVIRONMENTTAG: "{{ ENVIRONMENTTAG }}"
+    BUILD_NUMBER: "{{ BUILD_NUMBER }}"
+  when: ENVIRONMENT == "PROD-EUW1"
+
+- set_fact: 
+    SEQNUM: "{{ SEQNUM | int + 1 }}"
+  when: SEQNUM is defined
+  
+- set_fact:
+    SEQNUM: 1
+  when: SEQNUM is undefined
+  
+- set_fact:
+    TAGOWNERFL: "{{ PLATFORM | regex_replace('SPDJI','') }}"
+
+- name: LASTSUBNET is undefined
+  set_fact:
+    LASTSUBNET: ['subnet']
+  when: LASTSUBNET is undefined
+
+- name: Select Subnet
+  set_fact:
+    SUBNET: "{{ SUBNETS | difference(LASTSUBNET) | random }}"
+
+- name: debug
+  debug: 
+    msg: "Sequence Number is {{ SEQNUM }}"
+
+- set_fact:
+    TAGNAME: "{{ ENV }}-{{ PLATFORM }}-{{ ROLE }}-{{ BUILD_NUMBER }}-{{ SEQNUM }}"
+    TAGOWNER: "{{ PLATFORM }}"
+    TAGROLE: "{{ ROLE }}"
+  register: tagname
+
+- name: "tagname"
+  debug:
+    msg: "{{ tagname }}"
+  
+- set_fact:
+    DATADOG: "{{ DATADOG }}"
+  when: DATADOG is defined
+  
+- set_fact:
+    DATADOG: "True"
+  when: (DATADOG is undefined or DATADOG == '')
+  
+- debug:
+    msg: "{{ DSG }}"
+
+- name: Getting Session of Assumed Role
+  sts_assume_role:
+    region: "{{ REGION }}"
+    role_arn: "{{ ASSUMEROLE }}"
+    role_session_name: 'spdji-provision'
+  delegate_to: "{{ DELEGATEHOST }}"
+  register: assumed_role
+  
+- ec2_instance_info:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    region: "{{ REGION }}"
+    filters:
+        "tag:Name": "{{ TAGNAME }}"
+        "instance-state-name" : ['pending ','running','shutting-down','stopping','stopped']
+  delegate_to: localhost
+  register: ec2_facts
+  #when: "ACTION != 'SKIP'"
+
+- debug:
+    msg: "{{ ec2_facts }}"
+
+
+- set_fact: 
+    ACTION: "SKIP"
+    SUBNET: "{{ ec2_facts.instances[0].subnet_id }}" 
+  when: (ec2_facts.instances | length  > 0)
+
+- debug:
+    msg: "Instance {{ TAGNAME }} Already Exists"
+  when: (ec2_facts.instances | length  > 0)
+  
+- set_fact: 
+    ACTION: "PROCEED"  
+  when: (ec2_facts.instances | length  <= 0 )
+
+
+- set_fact:
+    IAMROLE: "EC2_{{ ENV }}_Role"
+
+- name: Fetch IAM Role based on specific APPs
+  iam_role_info:
+     name: "{{ APP }}-DB-EC2-ROLE-01"
+  register: iam_role
+  ignore_errors: yes
+
+- set_fact:
+    IAMROLE: "{{ iam_role.iam_roles[0].arn.split('/').1 }}"
+  when: iam_role != ""
+  ignore_errors: yes
+
+- debug:
+    msg: "{{ IAMROLE }}"
+  ignore_errors: yes
+
+
+- set_fact:
+    TAGOWNER: INFRA
+  when: APP == 'INFRATEST'
+  ignore_errors: yes 
+  
+- name: Setting build date variable 
+  set_fact: BDate="{{lookup('pipe','date \"+%Y-%m-%d \"')}}"
+
+- name: Setting build time variable
+  set_fact: BTime="{{lookup('pipe','date \"+%H:%M:%S \"')}}"
+
+- name: Create Instances with Random AZ
+  ec2:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    group_id: "{{ DSG }}"
+    instance_type: "{{INSTANCETYPE}}"
+    image: "{{ EC2AMI }}"
+    count: 1
+    vpc_subnet_id: "{{ SUBNET }}"
+    instance_profile_name: "{{ IAMROLE }}"
+    region: "{{ REGION }}"
+    #tags:
+    instance_tags:
+        Name: "{{ TAGNAME }}"
+        Owner: "{{ TAGOWNER }}"
+        ServerRole: "{{ TAGROLE }}"
+        Datadog: "{{ DATADOG }}"
+        BU: "DJI"
+        BuildDate: "{{ BDate }}"
+        BuildTime: "{{ BTime }}"
+        BuildNumber: "{{ BUILD_NUMBER }}"
+        AppName: "{{ ENVAPP }}"
+        #AppID: "EEA3AA80-35D5-4C84-8403-39761A7215B8"
+        Environment: "{{ ENVIRONMENTTAG }}" 
+        RetentionPeriod: "Not Applicable"
+    #user_data: "{{ USER_DATA }}"
+    termination_protection: yes
+    keypair: "{{ KEYPAIR }}"
+  when: AZ == "" and "ACTION != 'SKIP'"
+  register: aws_new_instance
+
+- debug:
+    msg: "{{aws_new_instance}}"
+
+- name: Wait for SSH to come up
+  delegate_to: "{{ item.private_ip }}"
+  wait_for_connection:
+    delay: 60
+    timeout: 180
+  loop: "{{ aws_new_instance.instances }}"
+  when: AZ == "" and "ACTION != 'SKIP'"
+
+- set_fact:
+    ipaddr: "{{ item.private_ip }}" 
+  loop: "{{ aws_new_instance.instances }}"
+  when: AZ == "" and "ACTION != 'SKIP'"
+  
+# - name: "Gathering the ec2 instances list based on the BuildNumber and the AppName"
+#   ec2_instance_facts:
+#     aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+#     aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+#     security_token: "{{ assumed_role.sts_creds.session_token }}"
+#     region: "{{ REGION }}"
+#     filters:
+#        "tag:BuildNumber": "{{ BUILD_NUMBER }}"
+#        "tag:AppName": "{{ ENVAPP }}"
+#   register: ec2_instances
+#   when: AZ == "" and ipaddr == "" and "ACTION != 'SKIP'"
+  
+# - set_fact:
+#     ipaddr: "{{ item.private_ip }}"
+#   with_items: "{{ ec2_instances.instances}}"
+#   when: AZ == "" and ipaddr == "" and "ACTION != 'SKIP'" 
+
+# - name: " ipaddr debug info"
+#   debug:
+#     msg: "{{ ipaddr }}"
+#   when: AZ == "" and "ACTION != 'SKIP'"
+  
+- name: register output for ec2 instance creation 
+  debug:
+    msg: "{{ aws_new_instance.instances }}"
+  when: AZ == ""
+  
+- name: Instance IPAddress 
+  debug:
+    msg: "{{ item.private_ip }}"
+  with_items: "{{ aws_new_instance.instances }}"
+  when: AZ == ""
+  
+- name: Instance ID 
+  debug:
+    msg: "{{ item.id }}"
+  with_items: "{{ aws_new_instance.instances }}"
+  when: AZ == ""
+
+- name: "Add Dynamodb Entry number and app"
+  shell: /local/apps/infra/scripts/BuildScripts/UpdateBuildState.py AppName="{{ ENVAPP }}" BuildID="{{ BUILD_NUMBER }}" IP="{{ ipaddr }}" BuildDate="{{ BDate }}" BuildTime="{{ BTime }}" INST_ID="{{ item.id }}" ENVIRONMENTTAG="{{ ENVIRONMENTTAG }}" ENVIRONMENT="{{ ENV }}" REGION="{{ REGION }}" IAMROLE="{{ IAMROLE }}"  KEYPAIR="{{ KEYPAIR }}" SG="{{ DSG }}"  INST_TYPE="{{ INSTANCETYPE }}" ROOT_VOL="{{ ROOTSIZE }}" SUBNETS="{{ SUBNETS }}" ASSUMEROLE="{{ ASSUMEROLE }}" DELEGATEHOST="{{ DELEGATEHOST }}" ENVAPP="{{ ENVAPP }}" BuildTriggerUserML="{{ BuildTUserML }}"
+  delegate_to: "{{ SCRIPTHOST }}"
+  with_items: "{{ aws_new_instance.instances }}"
+  when: AZ == "" and "ACTION != 'SKIP' and BUILD_NUMBER is defined "
+  remote_user: infra
+
+- name: Set old Subnet
+  set_fact:
+    LASTSUBNET: ["{{ SUBNET }}"]
+  #when: "ACTION != 'SKIP'"
+  
+- name: LASTSUBNET after DynamoDB update
+  debug:
+    msg: "{{ LASTSUBNET }}"
+  ignore_errors: true
+
+#- set_fact:
+#    myvar: "{{ ENVIRONMENTTAG }}-priv-db-{{ AZ }}"
+#    myvar: "priv-db-{{ AZ }}"
+#  when: AZ != ""
+#  register: value
+
+#- debug:
+#    msg: "{{value}}"
+
+- name: Get Subnet Details
+  ec2_vpc_subnet_info:
+    region: "{{ REGION }}"
+    filters:
+      "tag:Reach": "private"
+      "tag:Environment": "{{ ENVIRONMENTTAG  }}"
+      "tag:Usage": "DB"
+      "tag:AZ": "{{ AZ }}"
+  when: AZ != ""
+  register: ec2_vpc_subnet_out
+
+- debug: 
+    msg: "{{ec2_vpc_subnet_out}}"
+  when: AZ != ""
+      
+- set_fact:
+    subnet_ids: "{{ ec2_vpc_subnet_out.subnets|map(attribute='id')|list }}"
+  when: AZ != ""
+  register: subnet_info
+
+- debug:
+    msg: "{{subnet_info}}"
+      
+- name: Create Instances based on AZ
+  ec2:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    group_id: "{{ DSG }}"
+    instance_type: "{{ INSTANCETYPE }}"
+    image: "{{ EC2AMI }}"
+    count: 1
+    vpc_subnet_id: "{{ item }}"
+    #vpc_subnet_id: "subnet-0e50084b3f95eb986"
+    ec2_zone: "{{ AZ }}"
+    #ec2_zone: "us-west-2a"
+    instance_profile_name: "{{ IAMROLE }}"
+    region: "{{ REGION }}"
+    #tags:
+    instance_tags:
+        Name: "{{ TAGNAME }}"
+        Owner: "{{ APP }}"
+        ServerRole: "{{ TAGROLE }}"
+        Datadog: "{{ DATADOG }}"
+        BU: "DJI"
+        BuildDate: "{{ BDate }}"
+        BuildTime: "{{ BTime }}"
+        BuildNumber: "{{ BUILD_NUMBER }}"
+        AppName: "{{ ENVAPP }}"
+        #AppID: "EEA3AA80-35D5-4C84-8403-39761A7215B8"
+        Environment: "{{ ENVIRONMENTTAG }}"
+        RetentionPeriod: "Not Applicable"
+    termination_protection: yes
+    keypair: "{{ KEYPAIR }}"
+  with_items: "{{ subnet_info.ansible_facts.subnet_ids }}"
+  when: AZ != "" and "ACTION != 'SKIP'"
+  register: aws_new_az_instance
+
+- name: Wait for SSH to come up
+  delegate_to: "{{ item.instances[0].private_ip }}"
+  wait_for_connection:
+    delay: 60
+    timeout: 180
+  with_items: "{{ aws_new_az_instance.results }}"
+  when: AZ != "" and "ACTION != 'SKIP'"
+
+- set_fact:
+    ipaddr: "{{item.instances[0].private_ip }}" 
+  loop: "{{aws_new_az_instance.results }}"
+  when: AZ != "" and "ACTION != 'SKIP'"
+  
+# - name: "Gathering the ec2 instances list based on the BuildNumber and the AppName"
+#   ec2_instance_facts:
+#     aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+#     aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+#     security_token: "{{ assumed_role.sts_creds.session_token }}"
+#     region: "{{ REGION }}"
+#     filters:
+#        "tag:BuildNumber": "{{ BUILD_NUMBER }}"
+#        "tag:AppName": "{{ ENVAPP }}"
+#   register: ec2_az_instances
+#   when: ipaddr == "" and  "ACTION != 'SKIP'"
+  
+# - set_fact:
+#     ipaddr: "{{ item.private_ip }}"
+#   with_items: "{{ ec2_az_instances.instances}}"
+#   when: ipaddr == "" and "ACTION != 'SKIP'"
+
+# - name: " ipaddr debug info"
+#   debug:
+#     msg: "{{ ipaddr }}"
+#   when: "ACTION != 'SKIP'"
+  
+- name: register output for ec2 instance creation 
+  debug:
+    msg: "{{ aws_new_az_instance.results }}"
+  when: AZ != ""
+  
+- name: Instance IPAddress 
+  debug:
+    msg: "{{ item.instances[0].private_ip }}"
+  with_items: "{{ aws_new_az_instance.results }}"
+  when: AZ != ""
+  
+- name: Instance ID 
+  debug:
+    msg: "{{ item.instances[0].id }}"
+  with_items: "{{ aws_new_az_instance.results }}"
+  when: AZ != ""
+
+- name: "Add Dynamodb Entry number and app"
+  shell: /local/apps/infra/scripts/BuildScripts/UpdateBuildState.py AppName="{{ ENVAPP }}" BuildID="{{ BUILD_NUMBER }}" IP="{{ ipaddr }}" BuildDate="{{ BDate }}" BuildTime="{{ BTime }}" INST_ID="{{ item.instances[0].id }}" ENVIRONMENTTAG="{{ ENVIRONMENTTAG }}" ENVIRONMENT="{{ ENV }}" REGION="{{ REGION }}" IAMROLE="{{ IAMROLE }}"  KEYPAIR="{{ KEYPAIR }}" SG="{{ DSG }}"  INST_TYPE="{{ INSTANCETYPE }}" ROOT_VOL="{{ ROOTSIZE }}" SUBNETS="{{ subnet_info.ansible_facts.subnet_ids }}" ASSUMEROLE="{{ ASSUMEROLE }}" DELEGATEHOST="{{ DELEGATEHOST }}" ENVAPP="{{ ENVAPP }}" BuildTriggerUserML="{{ BuildTUserML }}"
+  delegate_to: "{{ SCRIPTHOST }}"
+  with_items: "{{ aws_new_az_instance.results }}"
+  when: AZ != "" and "ACTION != 'SKIP' and BUILD_NUMBER is defined"
+  remote_user: infra

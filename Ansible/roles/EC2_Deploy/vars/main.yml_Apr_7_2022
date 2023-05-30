@@ -1,0 +1,182 @@
+---
+# vars file 
+DELEGATEHOST: infra.spdji.com
+DEVSCRIPTHOST: infra.spdji.com
+#DELEGATEHOST: 10.164.241.100
+#DEVSCRIPTHOST: 10.164.241.100
+PRODSCRIPTHOST: prod.infra.spdji.com
+DRSCRIPTHOST: dr.infra.spdji.com
+#SYNTAGSCRIPT: /local/apps/infra/scripts/SyncEBSTags/SyncEBSTags.py
+SYNTAGSCRIPT: /local/apps/infra/scripts/UpdateTags/AutoUpdateTagsEC2.py
+
+
+RH7_VA_NonProd_Current: ami-0045ba659630a9776 #ami-0208b4bd71b533647 #ami-0d2cd7adee3d1fdfd #ami-0e4e19d59383f91d5 #ami-0e62ca9052c665e4f #ami-0698462d9bd226088 #ami-09cdda408523f0c7e #ami-0e861625287770aa7 #ami-0c8b556dc4f58087c #ami-0bb11d7d67e946c53
+RH7_OR_NonProd_Current: ami-094cf9e57801f8883 #ami-08b1c9adc048551f1 #ami-0fcf230021e2b2f9e #ami-0cd0812f2c7729414 #ami-037ba8499e3ab8173 #ami-0afba4646c4b15bb0 #ami-08e9c29e9464df330 #ami-0910cc4bbb5315500 #ami-086d699b25a41377e #ami-0b76d1343398bac29
+RH7_PROD_Current: ami-0dbe71e9e005b0227 #ami-006b752af174fd183 #ami-0e8a214beb1a6afac #ami-0aaab3d4a3b9d6d26 #ami-021906b9b9279fa13 #ami-0374184ad151a2a26 #ami-01216e08d30585a3e #ami-052905fcc1f6f4ef4 #ami-05985087acb911d18 #ami-0ed3c7ddeaf665248
+RH7_IE_PROD_Current: ami-0761029ecc7a160ac #ami-0f84a61e30bbfb753 #ami-0ce4483edddc84f87 #ami-097f29fc14c3a9815 #ami-0d8e2d64f5a5cf09f #ami-0b2ebf173b108860b #ami-0f8341ef4588ce2df #ami-0ef48007283a42ab8
+RH7_DR_Current: ami-097011257d5a7f6c3 #ami-024cd373a79cbe603 #ami-0b3e06215965d34f2 #ami-0168d3d838a567949 #ami-0b7f65d326654824f #c #ami-0e359c849d5c848da #ami-0337add0e4e7a3ad7 #ami-0064e56c0d9046d7e #ami-0039d760fed367bd4
+
+RH7_VA_NonProd_PrevM: ami-0208b4bd71b533647 #ami-0d2cd7adee3d1fdfd #ami-0e4e19d59383f91d5 #ami-0e62ca9052c665e4f #ami-0698462d9bd226088 #ami-09cdda408523f0c7e #ami-0e861625287770aa7 #ami-06945690159a7b412 #ami-0bb11d7d67e946c53 #ami-06d569511a5279804
+RH7_OR_NonProd_PrevM: ami-08b1c9adc048551f1 #ami-0fcf230021e2b2f9e #ami-0cd0812f2c7729414 #ami-037ba8499e3ab8173 #ami-0afba4646c4b15bb0 #ami-08e9c29e9464df330 #ami-0910cc4bbb5315500 #ami-0cd2daf90d5d7e11f #ami-0b76d1343398bac29 #ami-0cfb4ffb647a0a985
+RH7_PROD_PrevM: ami-006b752af174fd183 #ami-0e8a214beb1a6afac #ami-0aaab3d4a3b9d6d26 #ami-021906b9b9279fa13 #ami-0374184ad151a2a26 #ami-01216e08d30585a3e #ami-052905fcc1f6f4ef4 #ami-032e53ec0a495d405 #ami-0ed3c7ddeaf665248 #ami-0c95e39495c2bf616
+RH7_IE_PROD_PrevM: ami-0f84a61e30bbfb753 #ami-0ce4483edddc84f87 #ami-097f29fc14c3a9815 #ami-0d8e2d64f5a5cf09f #ami-0d8e2d64f5a5cf09f #ami-0b2ebf173b108860b #ami-0f8341ef4588ce2df #ami-0ef48007283a42ab8
+RH7_DR_PrevM: ami-024cd373a79cbe603 #ami-0b3e06215965d34f2 #ami-0168d3d838a567949 #ami-0b7f65d326654824f #ami-0c4206ddf0f17009a #ami-0e359c849d5c848da #ami-0337add0e4e7a3ad7 #ami-05809d639e29cfa2d #ami-0039d760fed367bd4 #ami-07f070f7dfafc73cb
+
+RH8_VA_NonProd_Current: ami-0b9b7bcd2fa64091e #ami-0293f2d23731d9a86 #ami-043fbda2ffac234d1 #ami-0699348a4c7f46c80 #ami-0e644329abf64f8fd #ami-0d9938f348d8544d8 #ami-0dd57bc066dbf9620 #ami-0fae6319306fe1b8b #ami-0a3a165627fa6c37b #ami-0975fa28c488e1d3f #ami-03aae2ce842a3fb05 #ami-098191399f731e73b #ami-01e7d7b63a5fd482b #ami-0be730ccc0fa9ad82 #ami-083e2ccec2b440deb #ami-07367087f1b484b66 #ami-0f667a0bc5f1ea785
+RH8_OR_NonProd_Current: ami-00e2ef4c724e64dd9 #ami-0cbfc43df4530e68d #ami-04248ba0544a9dafe #ami-060fce1222fa15ce6 #ami-05b6b5740ad8a2fe7 #ami-0542a52c2d42f2bb6 #ami-0fd14a1be480b63d1 #ami-055314ea1c5825261 #ami-074fca0f0a91d6169 #ami-0d7dcb3ab6c121339 #ami-06d08d156d565fffd #ami-0893d4cbc2cc8ae3b #ami-0e1f269126e849132 #ami-0bad5e9dde6f98630 #ami-0e99d7ac19b313006 #ami-07a7a88c81b7b4a37 #ami-04d54b4ea1b585abf
+RH8_PROD_Current: ami-0103b2f6474fea8d1 #ami-0c324f7ad3a794dc8 #ami-0d9abdae64eb18f03 #ami-07f4df1c95b80df21 #ami-055a009c1f9d02d9e #ami-0d6a3b36f572f0774 #ami-05526b8113505eac3 #ami-048b1c6af73ff42eb #ami-02958474baf1cbb18 #ami-0cca28b5c98983bc4 #ami-03ce326c204f749ad #ami-0b90fb3890feed372 #ami-03cf82bdbf3c7f625 #ami-0ee11039918472439 #ami-091691704e346f1d7 #ami-0f667a0bc5f1eaxxx
+RH8_IE_PROD_Current: ami-0158edef022dd3250 #ami-01deee437cea9cee6 #ami-0c05c456ec4f85ffe #ami-08086dca7cfdd8474 #ami-0b92ff1d184963306 #ami-043376bc5525afdde #ami-05153029120236e31 #ami-04885f54553ba1f05 #ami-0cf333f7dd7a86a1d #ami-0b8f2e3f25708986e #ami-0a85e9d7283540dd6 #ami-0f8ea0af34c83a98a #ami-013b7839482e66ab2 #ami-09da1666c8c745d05 #ami-0ef48007283a42ab8
+#PROD_EUW1_AMI: ami-013b7839482e66ab2 #ami-09da1666c8c745d05 #mi-0ef48007283a42ab8
+RH8_DR_Current: ami-03f4b6e81c21f8408 #ami-0aaadb3b0c36a99f9 #ami-071fa6afd01242fa3 #ami-0f588d26690c7ad34 #ami-07f4cc7ea01a9fdbf #ami-05575f9230bd7ff7b #ami-053aac555e57cfd70 #ami-0664bacbffa419f52 #ami-01dcc23d1f3611d76 #ami-03f82e47f1fe52c5d #ami-0415e21bc5b500eaa #ami-07e53fdcd6bc5174b #ami-0cf6ef01e753a0d27 #ami-05ecc588ca05d7f73 #ami-0cd451a737d90a739 #ami-07f070f7dfafc73cb #ami-04d54b4ea1b585yyy
+RH8_DR2_Current: ami-0e35782707ceb4e33 #ami-0fe89ee10e69c0264 #ami-0bcc4ef475e25ce7e #ami-072d6239ada7d62ad #ami-081f850749883354b #ami-0664bacbffa419f52
+
+RH8_VA_NonProd_PrevM: ami-0293f2d23731d9a86 #ami-043fbda2ffac234d1 #ami-0699348a4c7f46c80 #ami-0e644329abf64f8fd #ami-0d9938f348d8544d8 #ami-0dd57bc066dbf9620 #ami-0fae6319306fe1b8b #ami-0a3a165627fa6c37b #ami-0975fa28c488e1d3f #ami-03aae2ce842a3fb05 #ami-098191399f731e73b #ami-01e7d7b63a5fd482b #ami-0be730ccc0fa9ad82 #ami-083e2ccec2b440deb #ami-0b2eb58db3d9b5f8a #ami-0f667a0bc5f1ea785
+RH8_OR_NonProd_PrevM: ami-0cbfc43df4530e68d #ami-04248ba0544a9dafe #ami-060fce1222fa15ce6 #ami-05b6b5740ad8a2fe7 #ami-0542a52c2d42f2bb6 #ami-0fd14a1be480b63d1 #ami-055314ea1c5825261 #ami-074fca0f0a91d6169 #ami-0d7dcb3ab6c121339 #ami-06d08d156d565fffd #ami-0893d4cbc2cc8ae3b #ami-0e1f269126e849132 #ami-0bad5e9dde6f98630 #ami-0e99d7ac19b313006 #ami-0371cbda1ca052939 #ami-04d54b4ea1b585abf
+RH8_PROD_PrevM: ami-0c324f7ad3a794dc8 #ami-0d9abdae64eb18f03 #ami-07f4df1c95b80df21 #ami-055a009c1f9d02d9e #ami-0d6a3b36f572f0774 #ami-05526b8113505eac3 #ami-048b1c6af73ff42eb #ami-02958474baf1cbb18 #ami-0cca28b5c98983bc4 #ami-03ce326c204f749ad #ami-0b90fb3890feed372 #ami-03cf82bdbf3c7f625 #ami-0ee11039918472439 #ami-091691704e346f1d7 #ami-011a70c690c6da8cf #ami-0f667a0bc5f1eaxxxp
+RH8_IE_PROD_PrevM: ami-01deee437cea9cee6 #ami-0c05c456ec4f85ffe #ami-08086dca7cfdd8474 #ami-0b92ff1d184963306 #ami-043376bc5525afdde #ami-05153029120236e31 #ami-04885f54553ba1f05 #ami-0cf333f7dd7a86a1d #ami-0b8f2e3f25708986e #ami-0a85e9d7283540dd6 #ami-0f8ea0af34c83a98a #ami-013b7839482e66ab2 #ami-09da1666c8c745d05 #ami-0ef48007283a42ab8
+RH8_DR_PrevM: ami-0aaadb3b0c36a99f9 #ami-071fa6afd01242fa3 #ami-0f588d26690c7ad34 #ami-07f4cc7ea01a9fdbf #ami-05575f9230bd7ff7b #ami-053aac555e57cfd70 #ami-0664bacbffa419f52 #ami-01dcc23d1f3611d76 #ami-03f82e47f1fe52c5d #ami-0415e21bc5b500eaa #ami-07e53fdcd6bc5174b #ami-0cf6ef01e753a0d27 #ami-05ecc588ca05d7f73 #ami-0cd451a737d90a739 #ami-0e353ed0720e43489 #ami-04d54b4ea1b585yyyp
+RH8_DR2_PrevM: ami-0fe89ee10e69c0264 #ami-0bcc4ef475e25ce7e #ami-072d6239ada7d62ad #ami-081f850749883354b #ami-01dcc23d1f3611d76
+
+#NONPRODAMI: ami-0b0a49cc7c6c09a9c #NOV 2019 AMI
+#NONPRODAMI: ami-03a89e391026c28cd #17 Jan 2020 AMI
+#NONPRODAMI: ami-0bb11d7d67e946c53 ##ami-06d569511a5279804 #ami-08da99c67505d9c7b #ami-077f61397787010df #ami-028e0966b2f968acb #ami-02488d7f6e1195635 ##updated on Aug 12 2020 ##ami-0a3057c3d384620e7 ##Updated on July 14
+##NONPRODAMI: ami-0f667a0bc5f1ea785 ###RHEL8 #ami-08da99c67505d9c7b #ami-077f61397787010df #ami-028e0966b2f968acb #ami-02488d7f6e1195635 ##updated on Aug 12 2020 ##ami-0a3057c3d384620e7 ##Updated on July 14
+PRODAMI: ami-01216e08d30585a3e #ami-052905fcc1f6f4ef4 #ami-0ed3c7ddeaf665248 #ami-0c95e39495c2bf616 #ami-08c88b5b435bc9f3a #ami-027026fddbb792b59 #ami-02326afc3aae1b962 #ami-00ac40109240f7737 ## updated on Aug 12 2020  ##ami-0000c0049248fd594 ## july 14
+DRAMI: ami-0e359c849d5c848da #ami-0337add0e4e7a3ad7 #ami-0039d760fed367bd4 #ami-07f070f7dfafc73cb #ami-01c0f8dd3def7a53c #ami-0d7d5841f4efae054 #ami-0d98568dffe2b456e #ami-022a8c06b8dd2084d ## updated on Aug 12 2020 ##ami-0b35bb3f94d7ac764 ## july 14
+DR1AMI: ami-0e359c849d5c848da #ami-0337add0e4e7a3ad7 #ami-0039d760fed367bd4 #ami-07f070f7dfafc73cb #ami-01c0f8dd3def7a53c #ami-0d7d5841f4efae054 #ami-0d98568dffe2b456e #ami-022a8c06b8dd2084d ## updated on Aug 12 2020 ##ami-0b35bb3f94d7ac764 ## july 14
+#PROD_EUW1_AMI: ami-069f9d3ef1ca140e0
+#USW2_NONPRODAMI: ami-0b76d1343398bac29 #ami-0cfb4ffb647a0a985 #ami-0f58e6c4acd8b08bb #ami-0af2e2ab71e7ee8c2 #ami-0f1fa63a7d62bae62 #ami-071d0cd2cd7206a10 ## updated on Aug 12 2020 ##ami-0391c28ddf682f7b8 ## July 14
+#USW2_NONPRODAMI_RH8: ami-04d54b4ea1b585abf
+DR2AMI: ami-03e5acef913c940e0 ## updated on Aug 12 2020 ##ami-013983733542488ea  ##July 14
+DBGROUP:
+    - DB
+    - MongoDB
+    - Informatica
+    - MYSQL
+    - Oracle
+    - MSSQL
+    
+ALLOWEDROLES:
+    - DB
+    - APP
+    - Informatica
+    - MongoDB
+    - MYSQL
+    - Oracle
+    - MSSQL
+
+LOCAL_EC2_PARAMETERS:
+     - ENV: 'DEV'
+       PLATFORM: 'INFRA'
+       APP: 'INFRA'
+       ROLE: 'APP'
+       SUBROLE: 'TEST'
+       TYPE: 't2.micro'
+       APPSG: ['sg-0d75841d67bf9003b']
+       ROOTSIZE: '10'
+       LAPPSSIZE: '1'
+       SWAPSIZE: '1'
+       COUNT: '1'
+       SEQ: '40'
+      
+#EC2_NETWORK:
+ #   - { DEV: { REGION: 'us-east-1', VPCID: 'vpc-3e24bf58', subnets: ['subnet-894214a4','subnet-19cd2f52','subnet-22b76e46','subnet-58df9203'], DSG: ['sg-4615483a','sg-9581a6e1'], IAMROLE: 'DEV_EC2_Role', ASSUMEROLE: 'arn:aws:iam::699183880494:role/DEV-EC2-SELFSERV' }}
+
+#EC2_PARAMS:
+    #- { ENV: 'DEV', NAME: 'DEV-INFRA-51', OWNER: 'INFRA', ROLE: 'APP', TYPE: 't2.micro', ROOTSIZE: '10', LAPPSSIZE: '1', SWAPSIZE: '1', COUNT: '1' }
+  #  - { ENV: 'DEV', NAME: 'DEV-INFRA-51-DB', OWNER: 'INFRA', ROLE: 'APP', TYPE: 't2.micro', ROOTSIZE: '10', LAPPSSIZE: '1', SWAPSIZE: '1', COUNT: '1' }
+    #- { ENV: 'QA',  NAME: 'DEV-INFRA-52', OWNER: 'INFRA', ROLE: 'INFRA', TYPE: 't2.micro', ROOTSIZE: '10', LAPPSSIZE: '1', SWAPSIZE: '1', COUNT: '1' }
+    #- { ENV: 'QA',  NAME: 'DEV-INFRA-DB-52', OWNER: 'INFRA', ROLE: 'DB', TYPE: 't2.micro', ROOTSIZE: '10', LAPPSSIZE: '1', SWAPSIZE: '1', COUNT: '1' }
+    #- { ENV: 'UAT', NAME: 'DEV-INFRA-52', OWNER: 'INFRA', ROLE: 'APP', TYPE: 't2.micro', ROOTSIZE: '10', LAPPSSIZE: '1', SWAPSIZE: '1', COUNT: '1' }
+    #- { ENV: 'UAT', NAME: 'DEV-INFRA-DB-52', OWNER: 'INFRA', ROLE: 'DB', TYPE: 't2.micro', ROOTSIZE: '10', LAPPSSIZE: '1', SWAPSIZE: '1', COUNT: '1' }
+    #- { ENV: 'PROD', NAME: 'DEV-INFRA-52', OWNER: 'INFRA', ROLE: 'APP', TYPE: 't2.micro', ROOTSIZE: '10', LAPPSSIZE: '1', SWAPSIZE: '1', COUNT: '1' }
+    #- { ENV: 'PROD', NAME: 'DEV-INFRA-DB-52', OWNER: 'INFRA', ROLE: 'MongoDB', TYPE: 't2.micro', ROOTSIZE: '10', LAPPSSIZE: '1', SWAPSIZE: '1', COUNT: '1' }
+    #- { ENV: 'DR', NAME: 'DEV-INFRA-52', OWNER: 'INFRA', ROLE: 'APP', TYPE: 't2.micro', ROOTSIZE: '10', LAPPSSIZE: '1', SWAPSIZE: '1', COUNT: '1' }
+    #- { ENV: 'DR', NAME: 'DEV-INFRA-DB-52', OWNER: 'INFRA', ROLE: 'Informatica', TYPE: 't2.micro', ROOTSIZE: '10', LAPPSSIZE: '1', SWAPSIZE: '1', COUNT: '1' }
+
+LOCAL_USER_DATA: |
+    #!/bin/bash -xe
+    set -x
+    exec > >(tee /var/log/user-data.log) 2>&1
+    function updateresolve {
+        echo "options timeout:1 attempts:1 rotate" >/etc/resolv.conf
+        echo "search ec2.internal mhf.mhc" >> /etc/resolv.conf
+        echo "nameserver 10.201.226.21" >> /etc/resolv.conf
+        echo "#nameserver 10.164.232.2" >> /etc/resolv.conf
+        if [ -L /usr/bin/python ]; then file=yes; else file=no; fi
+        OS_MAJOR_VERSION=`sed -rn 's/.*([0-9])\.[0-9].*/\1/p' /etc/redhat-release` ; if [[ ( $OS_MAJOR_VERSION == 8 ) && ( $file == "no" ) ]]; then ln -s /usr/libexec/platform-python3.6 /usr/bin/python ; fi
+        #OS_MAJOR_VERSION=`sed -rn 's/.*([0-9])\.[0-9].*/\1/p' /etc/redhat-release` ; if (( $OS_MAJOR_VERSION == 8 )); then ln -s /usr/libexec/platform-python3.6 /usr/bin/python ; fi
+
+    }
+    function fixssh {
+        rm -f /tmp/fixssh.sh
+        OS_MAJOR_VERSION=`sed -rn 's/.*([0-9])\.[0-9].*/\1/p' /etc/redhat-release`
+        echo "$OS_MAJOR_VERSION in fixssh function"
+        if [ $OS_MAJOR_VERSION -eq 7 ]
+        then
+           #sed -i 's/apps\/docker-ce-stable/os\/rhel7\/docker-RH7-stable/gi' /etc/yum.repos.d/Infra-custom.repo  #temporary
+           yum -y install wget
+        else
+           #sed -i 's/apps\/docker-ce-stable/os\/rhel8\/docker-RH8-stable/gi' /etc/yum.repos.d/Infra-custom.repo   #temporary
+           dnf install wget -y
+        fi
+        
+        sed -i 's/^PasswordAuthentication no/\#PasswordAuthentication no/g' /etc/ssh/sshd_config
+        sed -i 's/AllowUsers/\#AllowUsers/g' /etc/ssh/sshd_config
+        systemctl restart sshd
+        
+        #cd /tmp;wget https://s3.amazonaws.com/spdji-infra-dev/fixssh.sh
+        #bash /tmp/fixssh.sh    
+        #systemctl restart sshd
+        }
+    function createfs {
+        INSTTYPE=`curl http://169.254.169.254/latest/meta-data/instance-type|awk -F"." '{print $1}'|cut -c2`
+        if [ $INSTTYPE == '5' -o $INSTTYPE == '3' ]
+        then
+            /usr/bin/sleep 60
+            /usr/sbin/mkfs.xfs /dev/nvme1n1
+            /usr/bin/mkdir -p /local/apps
+            lablkid=`blkid /dev/nvme1n1 |awk '{print $2}' |tr -d "\""`
+            echo "$lablkid /local/apps xfs defaults,nodev,noatime 0 2 " >> /etc/fstab
+            /usr/bin/mount /local/apps
+            chmod 755 /local/apps
+            /usr/bin/sleep 30
+            /sbin/mkswap /dev/nvme2n1
+            swblkid=`blkid /dev/nvme2n1|awk '{print $2}' |tr -d "\""`
+            echo "$swblkid none    swap    sw      0       0 " >> /etc/fstab 
+            /sbin/swapon -a
+        else        
+             /usr/bin/sleep 60
+            /usr/sbin/mkfs.xfs /dev/xvdb
+            /usr/bin/mkdir -p /local/apps
+            lablkid=`blkid /dev/xvdb |awk '{print $2}' |tr -d "\""`
+            echo "$lablkid /local/apps xfs defaults,nodev,noatime 0 2 " >> /etc/fstab
+            /usr/bin/mount /local/apps
+            chmod 755 /local/apps
+            /usr/bin/sleep 30
+            /sbin/mkswap /dev/xvdc
+            swblkid=`blkid /dev/xvdc|awk '{print $2}' |tr -d "\""`
+            echo "$swblkid none    swap    sw      0       0 " >> /etc/fstab 
+            /sbin/swapon -a
+        fi
+        }
+    function usercreate {
+        if ! id anscm >/dev/null 2>&1
+        then
+            useradd -u 34567 -d /home/anscm -p '$6$np5GwTHT$0r/QUDPvxhaOXo6z30QfN5VOavDIVffF/iKGvQWXodq0H1lgiTT1gNkFfiXNHJJAOHcm50mUDNA8ohWfaUnqI0' -m anscm
+            echo 'anscm ALL=(ALL) NOPASSWD: ALL' >>/etc/sudoers
+            mkdir /home/anscm/.ssh
+            echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDC2vayeEMLvR/WgpxS5MHCo2eW6BPORbWYw/JNwB/UNjZfJHkLLagPRrEmk8HqieptN5OC6Y+4mcbzC5Gr6shU2Q+CBlnQ6k7jxwLkWe2HhSRqrT4HbVxGPyy8XhrlunSgVhQrcCljXb6gmK/L9xZDIDcZbuAOqj8EfThLBo1QNuGMTOXaWDxg8sAgQGqRHVa75I7czmmGy6ix0QnqejpglpdDuoZeesHS6U+T0agA3Gnd6igG59hDhREPr3J/8GmxI2bLAy4X1drIeeEH9u6TWA9IFdUR9z164xrHGLhzrg3+t547CJhF8Ht4oHSys/SXUs3a5LyQfbwIEkG6MHI1 anscm@cim-tower-prod.cicd.spglobal.com' >/home/anscm/.ssh/authorized_keys
+            chown -R anscm:anscm /home/anscm/.ssh
+            chmod -R 700 /home/anscm/.ssh
+            chage -E -1 -M -1 anscm
+        fi
+        }
+    function mountmp {
+        mount -o remount,exec /tmp
+        }
+    updateresolve
+    usercreate
+    fixssh
+    createfs
+    mountmp

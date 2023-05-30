@@ -1,0 +1,74 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: false
+   
+  tasks:
+    - set_fact:
+        EBS_KEY: '12739c25-6a4d-4a8e-8557-a9162d0fc7ce'
+      when: ENVIRONMENT == "QA-USE1" or ENVIRONMENT == 'QA1-USE1' or ENVIRONMENT == 'QA2-USE1' or ENVIRONMENT == 'PRODFIX-USE1' or
+            ENVIRONMENT == "DEV-USE1" or ENVIRONMENT == 'DEV1-USE1' or ENVIRONMENT == 'DEV2-USE1' or ENVIRONMENT == "UAT-USE1"  
+
+    - set_fact:
+        EBS_KEY: 'c1167bfb-9503-4639-b887-cf78a30b8adb'
+      when: ENVIRONMENT == "PREPROD-USE1"
+    
+    - set_fact:
+        EBS_KEY: 'e451ee73-f369-419f-b258-1fd3fe58adb3'
+      when: ENVIRONMENT == "PROD-USE1"
+
+    - set_fact:
+        EBS_KEY: '5e13ad8c-8ef2-4e3b-a2b7-6154bd5f3604'
+      when: ENVIRONMENT == "DR-USW2"
+      
+    - set_fact:
+        EBS_KEY: '816528aa-fc92-4b72-88d0-cbc4f611fd73'
+      when: ENVIRONMENT == "QA-USW2"
+  
+  
+    - name: Retrieve Build Related Information from dynamodb
+      shell: /local/apps/infra/scripts/BuildScripts/RetrieveBuildInfo.py {{ ENVAPP }} {{ BUILD_NUMBER }}  
+      delegate_to: "{{ SCRIPTHOST }}"
+      remote_user: infra
+      register: BLDINFO
+
+    - set_fact:
+        var_dict: "{{ var_dict | default({}) | combine ({ item.split(': ')[0]: item.split(': ')[1]}) }}"
+      with_items: "{{ BLDINFO.stdout_lines }}"
+      #ignore_errors: yes
+
+    - name: Getting Session of Assumed Role
+      sts_assume_role:
+        region: "{{ var_dict['REGION'] }}"
+        role_arn: "{{ var_dict['ASSUMEROLE'] }}"
+        role_session_name: 'spdji-provision'
+      delegate_to: "{{ SCRIPTHOST }}"
+      register: assumed_role
+
+    - name: Gathering the ec2 instances list based on the BuildNumber and the AppName
+      ec2_instance_facts:
+       aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+       aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+       security_token: "{{ assumed_role.sts_creds.session_token }}"
+       region: "{{ var_dict['REGION'] }}"
+       filters:
+          "tag:BuildNumber": "{{ var_dict['BuildID'] }}"
+          "tag:AppName": "{{ var_dict['ENVAPP'] }}"
+          "tag:BuildDate": "{{ var_dict['BuildDate'] }}"
+      register: ec2_instances_list
+
+    - name: Create Additional Volumes to the EC2 Instance
+      ec2_vol:
+        aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+        aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+        security_token: "{{ assumed_role.sts_creds.session_token }}"
+        instance: "{{ item.instance_id }}"
+        region: "{{ var_dict['REGION'] }}"
+        device_name: "{{ VOL_NAME }}"
+        volume_type: gp2 
+        volume_size: '1024'
+        encrypted: yes
+        kms_key_id: "{{ EBS_KEY }}"
+        delete_on_termination: false
+      with_items: "{{ ec2_instances_list.instances }}"
+      register: ec2_volumes
