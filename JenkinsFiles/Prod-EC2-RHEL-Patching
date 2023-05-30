@@ -1,0 +1,665 @@
+import java.time.format.DateTimeFormatter
+
+pipeline {
+    
+    //agent { label "${params.Slave}" }
+    agent { label ' USE1-SLAVE-01 || USW2-SLAVE-01 '}
+
+     stages {
+
+         stage ('Echo Selected Parameters') {
+             steps {
+                 echo "$params.Environment $params.Region ${params.AZ} ${params.ServerType} ${params.Application} $params.Confirmation $params.Slave ${env.BUILD_NUMBER}"
+             }
+             
+         }
+
+         stage ('Send Email Notification to Support Teams') {
+             
+             steps {
+                 wrap([$class: 'BuildUser']) {
+                     script {
+                         emailext (
+                             from: 'IndexInfraMBX@spglobal.com',
+                             to: 'SPDJIAppSupport@spglobal.com,InfraNotificationMBX@spglobal.com,IndexInfraMBX@spglobal.com',
+                             //to: 'kirubakaran.kannan@spglobal.com',
+                             subject: "SPDJI AWS EC2 ${params.Environment} PATCHING JOB STARTED: ${env.JOB_NAME} Build Number ${env.BUILD_NUMBER}",
+                             body: "Patching Job has been initiated in '$params.Environment' Environment '${params.AZ}' Availability Zone for '${ServerType}' for '${Application}' Applications by ${BUILD_USER_EMAIL} For more details, Check console output at ${env.BUILD_URL}"
+                         )
+                     }
+                 }
+             }
+         }
+
+         stage ('Not Confirmed by User') {
+             when {
+                 expression { params.Confirmation == '' }
+                 expression { params.Confirmation == 'No'}
+             }
+             steps {
+                 echo "Please provide your Confirmation as 'YES' to proceed with patching"
+                 sh 'exit 1'
+             }
+         }
+
+         stage ('Improper Selection') {
+             when {
+                 expression { params.Application == '' }
+                 expression { params.AZ == ''}
+                 expression { params.ServerType == ''}
+             }
+             steps {
+                 echo "Please select Application, ServerType and Availability Zone to proceed with patching"
+                 sh 'exit 1'
+             }
+         }
+
+         stage ('Improper Selection - Availability Zone is Missing') {
+             when {
+                 expression { params.AZ == ''}
+             }
+             steps {
+                 echo "Please select Availability Zone to proceed with patching"
+                 sh 'exit 1'
+             }
+         }
+
+         stage ('Improper Selection - Application is Missing') {
+             when {
+                 expression { params.Application == ''}
+             }
+             steps {
+                 echo "Please select Applicaton to proceed with patching"
+                 sh 'exit 1'
+             }
+         }
+         
+         stage ('Improper Selection - Server Type is Missing') {
+             when {
+                 expression { params.ServerType == ''}
+             }
+             steps {
+                 echo "Please select ServerType to proceed with patching"
+                 sh 'exit 1'
+             }
+         }
+
+
+         stage ( 'Start Servers and Identify Hosts' ){
+             steps {
+
+                 start_servers()
+                 wait_for_ssh()
+                 identify_hosts()
+
+             }
+         }
+
+         stage ( 'Perform Pre patch tasks' ){
+             steps {
+
+                 pre_patch()
+		 rpmdb_error()
+
+             }
+         }
+
+         stage ( 'Register all the servers in Foreman' ){
+             steps {
+
+                 foreman_reg()
+
+             }
+         }
+
+         stage ( 'Perform Apache/Tomcat Upgrades' ){
+             steps {
+
+                 rpc_pipefs()
+                 update_tomcat()
+                 update_apache()
+
+             }
+         }
+
+         stage ( 'Executing Patching Playbooks' ){
+             steps {
+
+                 patch_execution()
+
+             }
+         }
+         
+         stage ( 'Executing Patching for Non Patched Servers' ) {
+             steps {
+
+                 get_nonpatched_servers()
+
+             }
+         }
+	 
+         stage ( 'Executing Post-Patching Scripts' ) {
+             steps {
+
+                 post_patch()
+
+             }
+         } 
+     }
+
+ post {
+        failure {        
+             script {
+                
+                     mail to: 'SPDJIAppSupport@spglobal.com,IndexInfraMBX@spglobal.com,InfraNotificationMBX@spglobal.com',
+                     subject: "SPDJI AWS EC2 ${params.Environment} Patching Status : Patching Failed on Build Number ${env.BUILD_NUMBER}",
+                     body: "Patching for ${params.Environment} Environment ${params.Application} APP is FAILED, for more details click on the url ${env.BUILD_URL}console"
+		     
+		     set_region()
+		     sh """
+		     mv $logPath/$logPathDate-${params.Environment}-${params.Region}-${env.BUILD_NUMBER}  $logPath/$logPathDate-${params.Environment}-${params.Region}-${env.BUILD_NUMBER}-FAILED
+		     """
+              }
+        }
+	
+	success {
+             script {
+                
+                     mail to: 'SPDJIAppSupport@spglobal.com,IndexInfraMBX@spglobal.com,InfraNotificationMBX@spglobal.com',
+		     //mail to: 'kirubakaran.kannan@spglobal.com',
+                     subject: "SPDJI AWS EC2 ${params.Environment} Patching Status : Patching is completed Successfully on Build Number ${env.BUILD_NUMBER}",
+                     body: "Patching for ${params.Environment} Environment ${params.Application} APP is SUCCESS, for more details click on the url ${env.BUILD_URL}console"
+             }
+	}
+      }
+}
+
+void set_region() {
+    script {
+       if ( params.Region == 'USE1') {
+            REGION = "us-east-1"
+            echo "Selected Region is $REGION"
+        }
+        else if ( params.Region == 'USW2') {
+            REGION = "us-west-2"
+            echo "Selected Region is $REGION"
+        }
+        else if ( params.Region == 'EUW1') {
+            REGION = "eu-west-1"
+            echo "Selected Region is $REGION"
+        }			     
+        else {
+            echo "No Region is selected"
+        }
+	logPath = '/local/apps/infra/patching_logs'
+	cDate = java.time.LocalDate.now()
+	currentDate = cDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+	logPathDate = cDate.format(DateTimeFormatter.ofPattern("dd-MMM-yyyy")).toUpperCase()
+    }
+}
+
+void start_servers() {
+    script {
+
+        set_region()
+        //Create inventory file and start all stopped instances
+        sh """
+        sh ${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/PatchingScripts/Prod/startec2_prod.sh "$REGION" "$params.Environment" "$params.Application" "$params.AZ" "${params.ServerType}" "${params.Region}" "${env.BUILD_NUMBER}"
+        """
+    }
+}
+
+void inventory() {
+        //Define Inventory file 
+        inventory_file = "${logPath}/${logPathDate}-${params.Environment}-${params.Region}-${env.BUILD_NUMBER}/all-${params.Environment}-${params.Region}-instances-ips-${currentDate}.log"
+        println inventory_file
+}
+
+void wait_for_ssh() {
+        
+	inventory()
+        //Playbook to determine the instances are up and running
+        ansiblePlaybook ([
+            credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',
+            playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/PatchingScripts/Prod/wait-for-ssh.yml',
+            inventory: "${inventory_file}",
+            installation: 'ansible-2.9.21',
+	    extras: "-e ansible_python_interpreter=/usr/libexec/platform-python"
+            ])
+}	   
+
+void identify_hosts() {
+
+    inventory()
+    ansiblePlaybook ([
+        credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',
+        inventory: "${inventory_file}",			 
+        playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/PatchingScripts/Prod/host-identification.yml',
+        installation: 'ansible-2.9.21',
+        extras: "-e ansible_python_interpreter=/usr/libexec/platform-python -e ENV=$params.Environment -e REG=$params.Region -e date=$logPathDate -e currentDate=$currentDate -e workpath=${logPath} -e buildNumber=${env.BUILD_NUMBER}"
+        ])
+}
+
+void reachable_inventory() {
+    
+    set_region()
+    reachable_hosts_inventory = "${logPath}/${logPathDate}-${params.Environment}-${params.Region}-${env.BUILD_NUMBER}/reachable-hosts-${currentDate}.log"
+    println reachable_hosts_inventory        
+}
+
+void pre_patch() {
+    script {
+    
+	reachable_inventory()
+    	ansiblePlaybook ([
+        	credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',
+        	inventory: "${reachable_hosts_inventory}",			 
+        	playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/PatchingScripts/Prod/pre-patch.yml',
+        	installation: 'ansible-2.9.21',
+        	extras: "-e ansible_python_interpreter=/usr/libexec/platform-python -e buildNumber=${env.BUILD_NUMBER}  -e AZ=${params.AZ} -e ENV=$params.Environment -e REG=$params.Region -e REGION=$REGION -e date=$logPathDate -e currentDate=$currentDate -e workpath=${logPath}"
+        	])
+		sleep 5
+    }
+}
+
+void rpmdb_error() {
+    script {
+
+        set_region()
+        sh """
+        sh ${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/PatchingScripts/Prod/trouble.sh "$params.Environment" "$params.Region" "${env.BUILD_NUMBER}"
+        sleep 5
+        """
+    }
+}
+
+void foreman_reg() {
+
+    reachable_inventory()
+    ansiblePlaybook ([
+        credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',
+        inventory: "${reachable_hosts_inventory}",			 
+        playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/PatchingScripts/Prod/foreman_reg.yml',
+        installation: 'ansible-2.9.21',
+        extras: "-e ansible_python_interpreter=/usr/libexec/platform-python -e REGION=$REGION"
+        ])	
+}
+
+void rpc_pipefs() {
+
+    reachable_inventory()
+    ansiblePlaybook ([
+        credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',
+        playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/PatchingScripts/Prod/check-rpc.yml',
+        inventory: "${reachable_hosts_inventory}",
+        installation: 'ansible-2.9.21',
+	extras: "-e ansible_python_interpreter=/usr/libexec/platform-python"
+        ])    
+}
+
+void update_tomcat() {
+ 
+    reachable_inventory()
+    ansiblePlaybook ([
+        credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',
+        inventory: "${reachable_hosts_inventory}",			   
+        playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/PatchingScripts/Prod/check-tomcat.yml',
+        installation: 'ansible-2.9.21',
+        extras: "-e ansible_python_interpreter=/usr/libexec/platform-python -e REG=$params.Region -e buildNumber=${env.BUILD_NUMBER} -e ENV=$params.Environment -e date=$logPathDate -e currentDate=$currentDate -e workpath=${logPath}"
+    ]) 
+}
+
+void update_apache() {
+
+    reachable_inventory()
+    ansiblePlaybook ([
+        credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',
+        inventory: "${reachable_hosts_inventory}",			   
+        playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/PatchingScripts/Prod/check-apache.yml',
+        installation: 'ansible-2.9.21',
+        extras: "-e ansible_python_interpreter=/usr/libexec/platform-python -e REG=$params.Region -e buildNumber=${env.BUILD_NUMBER} -e ENV=$params.Environment -e date=$logPathDate -e currentDate=$currentDate -e workpath=${logPath}"
+    ])
+}
+
+void patch_execution() {
+
+    reachable_inventory()
+    /*ansiblePlaybook ([
+       credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',
+       inventory: "${reachable_hosts_inventory}",
+       playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/PatchingScripts/Prod/qemu-guest-agent-removal.yml',
+       installation: 'ansible-2.9.21',
+       extras: "-e ansible_python_interpreter=/usr/libexec/platform-python"
+   ])
+   sleep 5*/
+   
+    ansiblePlaybook ([
+       credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',
+       inventory: "${reachable_hosts_inventory}",
+       playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/PatchingScripts/Prod/rhel-patching-1.yml',
+       installation: 'ansible-2.9.21',
+       extras: "-e ansible_python_interpreter=/usr/libexec/platform-python"
+   ])
+   sleep 5
+
+    ansiblePlaybook ([
+       credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',
+       inventory: "${reachable_hosts_inventory}",
+       playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/PatchingScripts/Prod/rhel-patching-2.yml',
+       installation: 'ansible-2.9.21',
+       extras: "-e ansible_python_interpreter=/usr/libexec/platform-python"
+   ])  
+   sleep 5
+
+    /*ansiblePlaybook ([
+       credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',
+       inventory: "${reachable_hosts_inventory}",
+       playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/Replace-Datadog-API-Key.yml',
+       installation: 'ansible-2.9.21',
+       extras: "-e ansible_python_interpreter=/usr/libexec/platform-python"
+   ])  */
+
+    ansiblePlaybook ([
+       credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',
+       inventory: "${reachable_hosts_inventory}",
+       playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/PatchingScripts/Prod/enable-datadog.yml',
+       installation: 'ansible-2.9.21',
+       extras: "-e ansible_python_interpreter=/usr/libexec/platform-python"
+   ]) 
+   sleep 5
+}
+
+void post_patch() {
+
+    reachable_inventory()
+    ansiblePlaybook ([
+         credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',
+         inventory: "${reachable_hosts_inventory}",
+         playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/PatchingScripts/Prod/post-patching.yml',
+         installation: 'ansible-2.9.21',
+         extras: " -e ansible_python_interpreter=/usr/libexec/platform-python -e buildNumber=${env.BUILD_NUMBER} -e date=$logPathDate -e workpath=${logPath} -e ENV=$params.Environment -e REG=$params.Region -e REGION=$REGION -e SERVER_TYPE='${params.ServerType}' -e APPLICATION=$params.Application"
+       ])	            
+    sleep 5	
+    script {
+        sh """
+        sh ${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/PatchingScripts/Prod/datadog-perms.sh "$params.Environment" "$params.Region" "${env.BUILD_NUMBER}"
+        sleep 5
+        sh ${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/PatchingScripts/Prod/stop-instances-back-down.sh "$params.Environment" "$params.Region" "$REGION"  "${env.BUILD_NUMBER}"
+        sleep 5
+	ansible-playbook ${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/PatchingScripts/Prod/unreachable_hosts.yml -e ansible_python_interpreter=/usr/libexec/platform-python -e ENV=${params.Environment} -e REGION=${params.Region} -e BUILD_NUMBER=${env.BUILD_NUMBER}
+	ansible-playbook -i /home/jenkins/${params.Environment}-${params.Region}-${env.BUILD_NUMBER}-unreachable-hosts ${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/PatchingScripts/Prod/unreachable_hosts2.yml -u jenkins -e ansible_python_interpreter=/usr/libexec/platform-python -e ENV=${params.Environment} -e REG=${REGION} -e REGION=${params.Region} -e BUILD_NUMBER=${env.BUILD_NUMBER}
+        """
+    }
+}
+
+void get_nonpatched_servers() {
+    script {
+
+        set_region()
+        //Create inventory file and start all stopped instances
+        sh """
+        sh ${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/PatchingScripts/NonProd/identify-patching-tag-no-servers.sh "$REGION" "$params.Environment" "$params.Application" "$params.AZ" "${params.ServerType}" "${params.Region}" "${env.BUILD_NUMBER}"
+        """
+    }
+}
+
+ properties ([
+	parameters ([	
+
+		 [$class: 'ChoiceParameter',
+			choiceType: 'PT_SINGLE_SELECT',
+			description: 'Please select Environment',
+			filterable: 'false',
+			name: 'Environment',
+			script: [
+				$class: 'GroovyScript',
+				fallbackScript: [
+					classpath: [],
+					sandbox: 'false',
+					script:
+						"return['Could not get Environment List']"
+						],
+				script: [
+					classpath:[],
+					sandbox: 'false',
+					script:
+						"return['PROD','DR','DR2']"
+					]
+				]
+			],
+
+		 [$class: 'CascadeChoiceParameter',
+			choiceType: 'PT_SINGLE_SELECT',
+			description: 'Please select Region',
+			filterable: 'false',
+			referencedParameters: 'Environment',
+			name: 'Region',
+			script: [
+				$class: 'GroovyScript',
+				fallbackScript: [
+					classpath: [],
+					sandbox: 'false',
+					script:
+						"return['Could not get Region List']"
+						],
+				script: [
+					classpath:[],
+					sandbox: 'false',
+					script:'''
+					if (Environment.equals("PROD")) {
+                        		return ["USE1","EUW1"]
+                      			} else if (Environment.equals("DR") || Environment.equals("DR2")) {
+                        		return ["USW2"]
+		                      	}  else {
+                		        return ["Please select environment"]
+                      			}
+					  '''
+					]
+				]
+			],
+		[$class: 'DynamicReferenceParameter',
+			choiceType: 'ET_FORMATTED_HTML',
+			description: ' Please select AZ from the list',
+			omitValueField: true, 
+			name: 'AZ',
+			referencedParameters: 'Region',
+			script: [
+				$class: 'GroovyScript',
+				fallbackScript: [
+					classpath: [],
+					sandbox: 'false',
+					script: 
+						"return['Could Not get AZ List']"
+					],
+					script: [
+						classpath: [],
+						sandbox: 'false',
+						script: '''
+                             if(Region.equals("USE1")) {
+                             use1= """
+                                <input type="checkbox" class="jenkins-parameter-input" json="us-east-1a" name="value" value="us-east-1a">
+                                <label for="us-east-1a" style="left: 22% position: relative;">us-east-1a &emsp; &emsp; &emsp;</label>
+                                <input type="checkbox" class="jenkins-parameter-input" json="us-east-1b" name="value" value="us-east-1b">
+                                <label for="us-east-1b" style="left: 22% position: relative;">us-east-1b &emsp; &emsp; &emsp;</label>
+                                <input type="checkbox" class="jenkins-parameter-input" json="us-east-1c" name="value" value="us-east-1c">
+                                <label for="us-east-1c" style="left: 22% position: relative;">us-east-1c &emsp; &emsp; &emsp;</label><br>
+                                <input type="checkbox" class="jenkins-parameter-input" json="us-east-1d" name="value" value="us-east-1d">
+                                <label for="us-east-1d" style="left: 22% position: relative;">us-east-1d &emsp; &emsp; &emsp;</label>
+                                <input type="checkbox" class="jenkins-parameter-input" json="us-east-1e" name="value" value="us-east-1e">
+                                <label for="us-east-1e" style="left: 22% position: relative;">us-east-1e &emsp; &emsp; &emsp;</label>
+                                <input type="checkbox" class="jenkins-parameter-input" json="us-east-1f" name="value" value="us-east-1f">
+                                <label for="us-east-1f" style="left: 22% position: relative;">us-east-1f &emsp; &emsp; &emsp;</label>
+                                
+                                 """
+                               return use1
+                             }                            
+                             
+                             else if(Region.equals("USW2")) {
+                             usw2= """
+                                <input type="checkbox" class="jenkins-parameter-input" json="us-west-2a" name="value" value="us-west-2a">
+                                <label for="us-west-2a" style="left: 22% position: relative;">us-west-2a &emsp; &emsp; &emsp;</label><br>
+                                <input type="checkbox" class="jenkins-parameter-input" json="us-west-2b" name="value" value="us-west-2b">
+                                <label for="us-west-2b" style="left: 22% position: relative;">us-west-2b &emsp; &emsp; &emsp;</label><br>
+                                <input type="checkbox" class="jenkins-parameter-input" json="us-west-2c" name="value" value="us-west-2c">
+                                <label for="us-west-2c" style="left: 22% position: relative;">us-west-2c &emsp; &emsp; &emsp;</label>
+                                """
+                             return usw2
+                             }
+
+                             else if(Region.equals("EUW1")) {
+                             euw1= """
+                                <input type="checkbox" class="jenkins-parameter-input" json="eu-west-1a" name="value" value="eu-west-1a">
+                                <label for="us-west-2a" style="left: 22% position: relative;">eu-west-1a &emsp; &emsp; &emsp;</label><br>
+                                <input type="checkbox" class="jenkins-parameter-input" json="eu-west-1b" name="value" value="eu-west-1b">
+                                <label for="us-west-2b" style="left: 22% position: relative;">eu-west-1b &emsp; &emsp; &emsp;</label><br>
+                                <input type="checkbox" class="jenkins-parameter-input" json="eu-west-1c" name="value" value="eu-west-1c">
+                                <label for="us-west-2c" style="left: 22% position: relative;">eu-west-1c &emsp; &emsp; &emsp;</label>
+                                """
+                             return euw1
+                             }
+                               
+                             else {
+                             return ['']
+                             }
+						'''
+						]
+					]
+				],
+		
+		extendedChoice( 
+			name: 'ServerType',
+			description: 'Please select server type to patch', 
+			multiSelectDelimiter: ',', 
+			quoteValue: false, 
+			saveJSONParameterToFile: false, 
+			type: 'PT_CHECKBOX', 
+			value:'Application Server, Database Server', 
+			visibleItemCount: 2),
+
+		[$class: 'DynamicReferenceParameter',
+			choiceType: 'ET_FORMATTED_HTML',
+			description: ' Please select the Application',
+			omitValueField: true, 
+			name: 'Application',
+			referencedParameters: 'Region',
+			script: [
+				$class: 'GroovyScript',
+				fallbackScript: [
+					classpath: [],
+					sandbox: 'false',
+					script: 
+						"return['Could Not get AZ List']"
+					],
+					script: [
+						classpath: [],
+						sandbox: 'false',
+						script: '''
+						app= """
+							<input type="checkbox" class="jenkins-parameter-input" json="ACFS" name="value" value="ACFS">
+							<label for="ACFS" style="left: 22% position: relative;">ACFS &emsp; &emsp; &emsp;</label>
+							<input type="checkbox" class="jenkins-parameter-input" json="ARROW" name="value" value="ARROW">
+							<label for="ARROW" style="left: 22% position: relative;">ARROW &emsp; &emsp; &emsp;</label>
+							<input type="checkbox" class="jenkins-parameter-input" json="AURA" name="value" value="AURA">
+							<label for="AURA" style="left: 22% position: relative;">AURA &emsp; &emsp; &emsp;</label>
+							<input type="checkbox" class="jenkins-parameter-input" json="AXIOMA" name="value" value="AXIOMA">
+							<label for="AXIOMA" style="left: 22% position: relative;">AXIOMA &emsp; &emsp; &emsp;</label>
+							<input type="checkbox" class="jenkins-parameter-input" json="CARE" name="value" value="CARE">
+							<label for="CARE" style="left: 22% position: relative;">CARE</label><br>
+							<input type="checkbox" class="jenkins-parameter-input" json="CIP" name="value" value="CIP">
+							<label for="CIP" style="left: 22% position: relative;">CIP &emsp; &emsp; &emsp; &nbsp;</label>
+							<input type="checkbox" class="jenkins-parameter-input" json="FIERCE" name="value" value="FIERCE">
+							<label for="FIERCE" style="left: 22% position: relative;">FIERCE &emsp; &emsp; &emsp; &nbsp;</label>
+							<input type="checkbox" class="jenkins-parameter-input" json="GRIP" name="value" value="GRIP">
+							<label for="GRIP" style="left: 22% position: relative;">GRIP &emsp; &emsp; &emsp; &ensp;</label>
+							<input type="checkbox" class="jenkins-parameter-input" json="IDS" name="value" value="IDS">
+							<label for="IDS" style="left: 22% position: relative;">IDS &emsp; &emsp; &emsp;  &ensp; &ensp; &nbsp;</label>
+							<input type="checkbox" class="jenkins-parameter-input" json="ILS" name="value" value="ILS">
+							<label for="ILS" style="left: 22% position: relative;">ILS</label><br>
+							<input type="checkbox" class="jenkins-parameter-input" json="INFRA" name="value" value="INFRA">
+							<label for="INFRA" style="left: 22% position: relative;">INFRA &emsp; &emsp; &nbsp;</label>
+							<input type="checkbox" class="jenkins-parameter-input" json="KENSTAR" name="value" value="KENSTAR">
+							<label for="KENSTAR" style="left: 22% position: relative;">KENSTAR &emsp; &emsp; &ensp;</label>
+							<input type="checkbox" class="jenkins-parameter-input" json="MDB" name="value" value="MDB">
+							<label for="MDB" style="left: 22% position: relative;">MDB &emsp; &emsp; &emsp; &nbsp;</label>
+							<input type="checkbox" class="jenkins-parameter-input" json="RIPA" name="value" value="RIPA">
+							<label for="RIPA" style="left: 22% position: relative;">RIPA &emsp; &emsp; &ensp; &ensp; &ensp; &nbsp;</label>
+							<input type="checkbox" class="jenkins-parameter-input" json="RIPACALC" name="value" value="RIPACALC">
+							<label for="RIPACALC" style="left: 22% position: relative;">RIPACALC</label><br>
+							<input type="checkbox" class="jenkins-parameter-input" json="SCORE" name="value" value="SCORE">
+							<label for="SCORE" style="left: 22% position: relative;">SCORE &emsp; &emsp; &nbsp;</label>
+							<input type="checkbox" class="jenkins-parameter-input" json="SPICE" name="value" value="SPICE">
+							<label for="SPICE" style="left: 22% position: relative;">SPICE &emsp; &emsp; &emsp; &ensp;</label>
+							<input type="checkbox" class="jenkins-parameter-input" json="SPIDER" name="value" value="SPIDER">
+                            <label for="SPIDER" style="left: 22% position: relative;">SPIDER &emsp; &emsp; &nbsp;</label>
+                            <input type="checkbox" class="jenkins-parameter-input" json="SPDJIBLOGS" name="value" value="SPDJIBLOGS">
+                            <label for="SPDJIBLOGS" style="left: 22% position: relative;">SPDJIBLOGS &emsp; &emsp;</label>
+                            <input type="checkbox" class="jenkins-parameter-input" json="SPDJIVAULT" name="value" value="SPDJIVAULT">
+                            <label for="SPDJIVAULT" style="left: 22% position: relative;">SPDJIVAULT &ensp; </label><br>
+                            <input type="checkbox" class="jenkins-parameter-input" json="SPROUT" name="value" value="SPROUT">
+                            <label for="SPROUT" style="left: 22% position: relative;">SPROUT &ensp; &ensp; &nbsp; </label>
+                            <input type="checkbox" class="jenkins-parameter-input" json="SPDTAT" name="value" value="SPDTAT">
+                            <label for="SPDTAT" style="left: 22% position: relative;">SPDTAT &ensp; &ensp; </label>
+                            <input type="checkbox" class="jenkins-parameter-input" json="T3" name="value" value="T3">
+                            <label for="T3" style="left: 22% position: relative;">T3</label>
+						"""
+						return app
+						'''
+					]
+				]
+			],
+
+		 [$class: 'CascadeChoiceParameter',
+			choiceType: 'PT_SINGLE_SELECT',
+			description: '',
+			filterable: 'false',
+			referencedParameters: 'Region',
+			name: 'Slave',
+			script: [
+				$class: 'GroovyScript',
+				fallbackScript: [
+					classpath: [],
+					sandbox: 'false',
+					script:
+						"return['Could not get Slave List']"
+						],
+				script: [
+					classpath:[],
+					sandbox: 'false',
+					script:'''
+					if (Region.equals("USE1")) {
+                        return ["USE1-SLAVE-01","USW2-SLAVE-01"]
+                      } else if (Region.equals("USW2")) {
+                        return ["USW2-SLAVE-01","USE1-SLAVE-01"]
+                      } else if (Region.equals("EUW1")) {
+                        return ["USE1-SLAVE-01","USW2-SLAVE-01"]
+                      } else {
+                        return ["USE1-SLAVE-01","USW2-SLAVE-01"]
+                      }
+					  '''
+					]
+				]
+			],
+
+		 [$class: 'ChoiceParameter',
+			choiceType: 'PT_SINGLE_SELECT',
+			description: 'Please provide your confirmation to proceed with Patching',
+			name: 'Confirmation',
+			script: [
+				$class: 'GroovyScript',
+				fallbackScript: [
+					classpath: [],
+					sandbox: 'false',
+					script:
+						"return['Could not get confirmation list']"
+						],
+				script: [
+					classpath:[],
+					sandbox: 'false',
+					script:
+						"return['','Yes','No']"
+					]
+				]
+			]
+		
+		])
+	])

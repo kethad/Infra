@@ -1,0 +1,579 @@
+pipeline {
+
+    agent { label "USE1-SLAVE-01 || USW2-SLAVE-01" }
+    stages {
+
+
+        stage('SSM-Parameters-Echo') {
+
+             steps {
+
+                echo "  ${params.Environment} ${params.Region} ${APP} ${params.ParameterName}  "
+
+             }
+         }
+        stage('SSMParameter-SecureString') {
+            when {
+                expression { params.STAGES == 'SSMParameterCreation'  }
+                expression { params.Environment == 'DEV' || params.Environment == 'QA' || params.Environment == 'UAT' || params.Environment == 'BETA' || params.Environment == 'DEV2' || params.Environment == 'QA2' || params.Environment == 'UAT2'  || params.Environment == 'QADR' || params.Environment == 'UATDR' }
+		expression { params.TypeOfParameter == 'SecureString' }
+            }
+            steps {
+               echo "${params.STAGES} is the Selected Stage for ${params.Environment}"
+               rgn()
+               audit()
+               key_id()
+               //kms_arn()
+	       //secret()
+               AppID()
+	       mail_list()
+               echo "${BUILD_USER} is Build_User"
+               echo "${BUILD_USER_MAIL_ID} is Build_User_Mail_ID"
+               script{
+	      	  secret = "${params.ParameterValue}"
+	          wrap([$class: 'MaskPasswordsBuildWrapper',varPasswordPairs: [[password: secret]]]) {
+	          echo 'Retrieve Secret: ' +  secret			
+                  sh " aws ssm put-parameter --name /${params.Environment}/${APP}/${params.ParameterName} --value \"${params.ParameterValue}\" --type \"SecureString\" --key-id \"${key}\" --tags \"Key\"=\"Name\",\"Value\"=/${params.Environment}/${APP}/${params.ParameterName} \"Key\"=\"Owner\",\"Value\"=${APP} \"Key\"=\"AppID\",\"Value\"=${appid} \"Key\"=\"Environment\",\"Value\"=${params.Environment} \"Key\"=\"BU\",\"Value\"=\"DJI\" --region ${region} "
+               //sh " aws ssm put-parameter --name \"infra-ssm-devender-test2\" --value \"P@ssW%rd#1\" --type \"SecureString\" --key-id \"arn:aws:kms:us-east-1:699183880494:key/09b6450d-288a-4a6a-88ec-01f2a3f17e32\" --tags \'Key\'=\'Owner\',\'Value\'=\'INFRA\' \'Key\'=\'AppID\',\'Value\'=\'EEA3AA80-35D5-4C84-8403-39761A7215B8\' \'Key\'=\'Environment\',\'Value\'=\'DEV\' \'Key\'=\'BU\',\'Value\'=\'SPDJI\' "
+                  }
+               }
+
+             }
+        }
+	 stage('SSMParameter-String') {
+            when {
+                expression { params.STAGES == 'SSMParameterCreation'  }
+                expression { params.Environment == 'DEV' || params.Environment == 'QA' || params.Environment == 'UAT' || params.Environment == 'BETA' || params.Environment == 'DEV2' || params.Environment == 'QA2' || params.Environment == 'UAT2' || params.Environment == 'QADR' || params.Environment == 'UATDR' }
+		expression { params.TypeOfParameter == 'String' }
+            }
+            steps {
+               echo "${params.STAGES} is the Selected Stage for ${params.Environment}"
+               rgn()
+               audit()
+               //secret()
+               AppID()
+               mail_list()
+               echo "${BUILD_USER} is Build_User"
+               echo "${BUILD_USER_MAIL_ID} is Build_User_Mail_ID"
+               script{
+                  secret = "${params.ParameterValue}"
+                  wrap([$class: 'MaskPasswordsBuildWrapper',varPasswordPairs: [[password: secret]]]) {
+                  echo 'Retrieve Secret: ' +  secret
+                  sh " aws ssm put-parameter --name /${params.Environment}/${APP}/${params.ParameterName} --value \"${params.ParameterValue}\" --type \"String\" --tags  \"Key\"=\"Name\",\"Value\"=/${params.Environment}/${APP}/${params.ParameterName} \"Key\"=\"Owner\",\"Value\"=${APP} \"Key\"=\"AppID\",\"Value\"=${appid} \"Key\"=\"Environment\",\"Value\"=${params.Environment} \"Key\"=\"BU\",\"Value\"=\"DJI\" --region ${region} "
+                  }
+		}
+	     }
+	}		
+
+        stage('SSMParameter-SecureString-WebPlatform') {
+            when {
+                expression { params.STAGES == 'SSMParameterCreation-WebPlatform'  }
+                expression { params.Environment == 'DEV' || params.Environment == 'QA' || params.Environment == 'UAT' || params.Environment == 'DEV2' || params.Environment == 'QA2' || params.Environment == 'UAT2' || params.Environment == 'QADR' || params.Environment == 'UATDR' }
+		expression { params.TypeOfParameter == 'SecureString' }
+                expression { params.APP == 'ARROW' || params.APP == 'IDS' }
+            }
+            steps {
+               echo "${params.STAGES} is the Selected Stage for ${params.Environment}"
+               rgn()
+               audit()
+               //kms_key()
+	       //secret()
+               AppID()
+	       mail_list()
+               echo "${BUILD_USER} is Build_User"
+               echo "${BUILD_USER_MAIL_ID} is Build_User_Mail_ID"
+               script{
+	      	  secret = "${params.ParameterValue}"
+	          wrap([$class: 'MaskPasswordsBuildWrapper',varPasswordPairs: [[password: secret]]]) {
+	          echo 'Retrieve Secret: ' +  secret			
+                  sh " aws ssm put-parameter --name ${params.ParameterName} --value \"${params.ParameterValue}\" --type \"SecureString\" --key-id ${params.key_arn} --tags \"Key\"=\"Name\",\"Value\"=${params.ParameterName} \"Key\"=\"Owner\",\"Value\"=${APP} \"Key\"=\"AppID\",\"Value\"=${appid} \"Key\"=\"Environment\",\"Value\"=${params.Environment} \"Key\"=\"BU\",\"Value\"=\"DJI\" --region ${region} "
+               //sh " aws ssm put-parameter --name \"infra-ssm-devender-test2\" --value \"P@ssW%rd#1\" --type \"SecureString\" --key-id \"arn:aws:kms:us-east-1:699183880494:key/09b6450d-288a-4a6a-88ec-01f2a3f17e32\" --tags \'Key\'=\'Owner\',\'Value\'=\'INFRA\' \'Key\'=\'AppID\',\'Value\'=\'EEA3AA80-35D5-4C84-8403-39761A7215B8\' \'Key\'=\'Environment\',\'Value\'=\'DEV\' \'Key\'=\'BU\',\'Value\'=\'SPDJI\' "
+                  }
+               }
+
+             }
+        }
+	 stage('SSMParameter-String-WebPlatform') {
+            when {
+                expression { params.STAGES == 'SSMParameterCreation-WebPlatform'  }
+                expression { params.Environment == 'DEV' || params.Environment == 'QA' || params.Environment == 'UAT' || params.Environment == 'DEV2' || params.Environment == 'QA2' || params.Environment == 'UAT2' || params.Environment == 'QADR' || params.Environment == 'UATDR' }
+		expression { params.TypeOfParameter == 'String' }
+                expression { params.APP == 'ARROW' || params.APP == 'IDS' }
+            }
+            steps {
+               echo "${params.STAGES} is the Selected Stage for ${params.Environment}"
+               rgn()
+               audit()
+               //secret()
+               AppID()
+               mail_list()
+               echo "${BUILD_USER} is Build_User"
+               echo "${BUILD_USER_MAIL_ID} is Build_User_Mail_ID"
+               script{
+                  secret = "${params.ParameterValue}"
+                  wrap([$class: 'MaskPasswordsBuildWrapper',varPasswordPairs: [[password: secret]]]) {
+                  echo 'Retrieve Secret: ' +  secret
+                  sh " aws ssm put-parameter --name ${params.ParameterName} --value \"${params.ParameterValue}\" --type \"String\" --tags  \"Key\"=\"Name\",\"Value\"=${params.ParameterName} \"Key\"=\"Owner\",\"Value\"=${APP} \"Key\"=\"AppID\",\"Value\"=${appid} \"Key\"=\"Environment\",\"Value\"=${params.Environment} \"Key\"=\"BU\",\"Value\"=\"DJI\" --region ${region} "
+                  }
+		}
+	     }
+	}		
+
+
+
+        stage('SSMParameterValueUpdate-SecureString') {
+                when {
+                expression { params.STAGES == 'SSMParameterValueUpdate'  }
+                expression { params.Environment == 'DEV' || params.Environment == 'QA' || params.Environment == 'UAT' || params.Environment == 'BETA' || params.Environment == 'DEV2' || params.Environment == 'QA2' || params.Environment == 'UAT2' || params.Environment == 'QADR' || params.Environment == 'UATDR' }
+                expression { params.TypeOfParameter == 'SecureString' }
+            }
+            steps {
+               echo "${params.STAGES} is the Selected Stage for ${params.Environment}"
+               rgn()
+               audit()
+	       //secret()
+               AppID()
+	       mail_list()
+               echo "${BUILD_USER} is Build_User"
+               echo "${BUILD_USER_MAIL_ID} is Build_User_Mail_ID"
+               script{
+                  secret = "${params.ParameterValue}"
+                  wrap([$class: 'MaskPasswordsBuildWrapper',varPasswordPairs: [[password: secret]]]) {
+                  echo 'Retrieve Secret: ' +  secret
+                  //sh " aws ssm put-parameter --name /${params.Environment}/${APP}/${params.ParameterName} --value \"${params.ParameterValue}\" --type \"SecureString\"  --region ${region} --overwrite "
+                  sh " aws ssm put-parameter --name ${params.ParameterName} --value \"${params.ParameterValue}\" --type \"SecureString\"  --region ${region} --overwrite "
+                }
+              }
+           }
+        } 
+
+        stage('SSMParameterValueUpdate-String') {
+                when {
+                expression { params.STAGES == 'SSMParameterValueUpdate'  }
+                expression { params.Environment == 'DEV' || params.Environment == 'QA' || params.Environment == 'UAT' || params.Environment == 'BETA' || params.Environment == 'DEV2' || params.Environment == 'QA2' || params.Environment == 'UAT2' || params.Environment == 'QADR' || params.Environment == 'UATDR' }
+                expression { params.TypeOfParameter == 'String' }
+            }
+            steps {
+               echo "${params.STAGES} is the Selected Stage for ${params.Environment}"
+               rgn()
+               audit()
+	       //secret()
+               AppID()
+	       mail_list()
+               echo "${BUILD_USER} is Build_User"
+               echo "${BUILD_USER_MAIL_ID} is Build_User_Mail_ID"
+               script{
+                  secret = "${params.ParameterValue}"
+                  wrap([$class: 'MaskPasswordsBuildWrapper',varPasswordPairs: [[password: secret]]]) {
+                  echo 'Retrieve Secret: ' +  secret
+                  //sh " aws ssm put-parameter --name /${params.Environment}/${APP}/${params.ParameterName} --value \"${params.ParameterValue}\" --type \"String\"  --region ${region} --overwrite "
+                  sh " aws ssm put-parameter --name ${params.ParameterName} --value \"${params.ParameterValue}\" --type \"String\"  --region ${region} --overwrite "
+                   }
+                }
+               }
+             } 
+           }
+	   
+	     post {
+        	failure {
+		   script {
+		        mail_list()
+                 	mail to: "${mail_id},d.kethavath@spglobal.com,IndexInfraMBX@spglobal.com",
+                 	subject: "SSMParameter: SSM parameter creation failed for : ${params.Environment} Environment ${env.BUILD_NUMBER} BuildNumber",
+                 	body: "SSM parameter : SSM parameter creation failed for : ${params.Environment} Environemnt ${env.BUILD_NUMBER} BuildNumber, for more details click on the url ${env.BUILD_URL}console "
+        	}
+		}
+        
+        	success {
+		    script {
+			if ( params.STAGES == 'SSMParameterCreation' ) {
+		        	mail_list()  
+                 		mail to: "${mail_id},IndexInfraMBX@spglobal.com",
+                 		subject: "SSMParameter: /${params.Environment}/${APP}/${params.ParameterName}creation successfuly completed for: ${params.Environment} Environemnt ${env.BUILD_NUMBER} BuildNumber",
+                 	        body: "SSMParameter:  /${params.Environment}/${APP}/${params.ParameterName} creation successfuly completed for: ${params.Environment} Environment ${env.BUILD_NUMBER} BuildNumber "
+		      } else if ( params.STAGES == 'SSMParameterValueUpdate' ) {
+				mail_list()
+				mail to: "${mail_id},IndexInfraMBX@spglobal.com",
+				subject: "SSMParameterValueUpdate: ${params.ParameterName} updated successfuly completed for: ${params.Environment} Environemnt ${env.BUILD_NUMBER} BuildNumber",
+                                body: "SSMParameterValueUpdate:  ${params.ParameterName} updated successfuly completed for: ${params.Environment} Environment ${env.BUILD_NUMBER} BuildNumber " 
+			
+		     }
+			   
+		}
+          } 
+}
+}
+        void rgn() {
+                script {
+                       if ( params.Region == 'USE1' ) {
+                                RGN="VA"
+                                region="us-east-1"
+                                echo "${RGN} is Short form of North Virginia"
+
+                       }  else if (  params.Region == 'USW2' ) {
+                                RGN="OR"
+                                region="us-west-2"
+                                echo "${RGN} is Short form of Oregon"
+                       }
+
+                  }
+        }
+
+        void kms_key() {
+                script {
+                       if ( params.Region == 'USE1' ) {
+                                key="arn:aws:kms:us-east-1:699183880494:key/09b6450d-288a-4a6a-88ec-01f2a3f17e32"
+                                echo "${key} is KMS key ARN"
+
+                       }  else if (  params.Region == 'USW2' ) {
+                                key="arn:aws:kms:us-west-2:699183880494:key/91bd9643-0f4e-42c3-bc22-f2eb33a97598"
+                                echo "${key} is KMS key ARN"
+                       }
+
+                  }
+        }
+
+        void key_id() {
+                script {
+                        if (params.Key_Name == 'DEV-ARROW-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/34aa8655-1b0a-43b3-98b7-418bdc60a3d6"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'QA-ARROW-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/c9580aa1-7fdb-4b64-890c-5f81297ffc40"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'BETA-ARROW-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/4d43e48a-30d1-429c-90f9-a11190bfac82"
+                                echo "${key} is KMS key ARN" 
+                        }  else if (params.Key_Name == 'NONPROD-SSM-CMK-01' && params.Region == 'USE1' ) { 
+                                key="arn:aws:kms:us-east-1:699183880494:key/09b6450d-288a-4a6a-88ec-01f2a3f17e32"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'NONPROD-SSM-CMK-01' && params.Region == 'USW2') {
+                                key="arn:aws:kms:us-west-2:699183880494:key/91bd9643-0f4e-42c3-bc22-f2eb33a97598"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'DEV-CARE-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/52a8204d-4f60-4b59-92d8-f75e08c27a0e"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'QA-CARE-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/3d4dd44b-6c88-4509-9c0a-2249a70e2501"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'BETA-CARE-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/f3e38b75-a0c1-4616-a8ff-53b087cf05cb"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'DEV-SPICE-DATASERVICES-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/36592a95-0e31-485a-9c02-1a835e45f9f7"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'QA-DATA-SERVICES-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/bb4b5529-663d-4f50-bf5c-d521304f28d8"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'BETA-DATA-SERVICES-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/94e4de26-9aa9-487f-adc5-51385df54e3d"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'DEV-EDX-FILE-WATCHER-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/5e04a90f-5349-4075-8ddc-9cd6d42c3f35"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'QA-EDX-FILE-WATCHER-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/840f14ab-217d-4e0a-9ed3-6818761e6e57"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'BETA-EDX-FILE-WATCHER-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/052886d0-e6fe-4b27-8cf7-4e54ae504df5"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'DEV-IDS-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/69158e80-f8d2-4c06-887f-285c06ef9bd4"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'QA-IDS-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/09d0ef51-a670-4de6-8aa1-d2bb3e224b01"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'BETA-IDS-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/61c765ed-d124-4518-ac63-58017432121e"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'DEV-INDEXOLOGYBLOG-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/eb477c07-4ff8-46d6-a42f-4025485b59eb"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'QA-INDEXOLOGYBLOG-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/045be404-8175-4f40-ad6a-5554728112b6"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'BETA-INDEXOLOGYBLOG-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/eae0ad17-06d0-443a-b948-1ee93e4e3ba8"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'DEV-PPM-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/62500d6e-b814-463e-b6fa-e99117530e25"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'QA-PPM-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/5d994d34-f303-4ab8-8160-a4ceeaa1b3d5"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'BETA-PPM-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/18a27c3d-4eb3-4efe-887d-d6f791e7ade9"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'DEV-RIPA-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/d22d9d55-6967-4329-a62e-396e346826cb"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'QA-RIPA-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/c163230f-8d0c-4bdf-8f66-11fd4e8ab06a"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'BETA-RIPA-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/75613e2e-aec0-48be-8682-5979f278ebb4"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'DEV-RIPACALC-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/fa05ba3e-cf6b-4aa7-8672-acfa7c2ac77c"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'QA-RIPACALC-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/4782216b-f0d1-4ca7-a421-2d8d63e992a8"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'BETA-RIPACALC-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/9749f22f-a5e7-40ca-a613-1e46ef02ae67"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'DEV-ROE-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/43190b11-c827-4265-a465-3950a1d87c9b"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'QA-ROE-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/da04fb40-018c-4faf-af02-e415173a4dd9"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'BETA-ROE-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/c888585d-c1fd-43eb-b507-8c10a364752d"
+                                echo "${key} is KMS key ARN"   
+                        }  else if (params.Key_Name == 'DEV-SPACE-SERVICES-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/8c10b0ff-ba26-43cc-b124-8d54107e9f28"
+                                echo "${key} is KMS key ARN" 
+                        }  else if (params.Key_Name == 'QA-SPACE-SERVICES-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/c7b3ccd3-72a4-4068-8521-5ec1644ecc0e"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'BETA-SPACE-SERVICES-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/56e3b958-f896-4c2b-9dbd-6ada376331c1"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'DEV-SPDJI-ETL-SERVICES-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/a0526aa2-f727-4534-8757-b5d75ba7d576"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'QA-SPDJI-ETL-SERVICES-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/9ac1470b-755c-4db2-8d2a-7ef61afac5eb"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'BETA-SPDJI-ETL-SERVICES-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/4cae9db6-987e-4e8c-8326-ea32d30fb650"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'DEV-SPICE-ECS-KMS') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/067806e9-34ff-4fce-8407-08b6ec64c26a"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'QA-SPICE-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/4c7870b7-428a-4875-b101-9b428cc299dc"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'BETA-SPICE-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/aca71651-653a-4cd0-872a-6bf2664ce776"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'DEV-VAULT-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/cae82abe-96f5-4c0b-84f6-c251ac7d0489"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'QA-VAULT-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/d3299be0-04c1-476e-bc11-e5c3048b765d"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'BETA-VAULT-KEY-01') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/80cf0295-0480-494f-a189-a9bca300cd48"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == '' && params.Region == 'USE1') {
+                                key=""
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'DEV-ACFS-KEY-01' && params.Region == 'USE1') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/b6de37ea-de73-4059-841f-7d33a5413fa7"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'QA-ACFS-KEY-01' && params.Region == 'USE1') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/mrk-ca9f61f3e1324eacb7b0637b15ac00e3"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'UAT-ACFS-KEY-01' && params.Region == 'USE1') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/mrk-ac0af9a524d64df88d871ed417dff7ea"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'DEV-ACFS-KET-01' && params.Region == 'USW2') {
+                                key="arn:aws:kms:us-west-2:699183880494:key/8215bc2d-7bbd-4455-ac39-2bc52f659256"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'QA-ACFS-KEY-01' && params.Region == 'USW2') {
+                                key="arn:aws:kms:us-west-2:699183880494:key/mrk-ca9f61f3e1324eacb7b0637b15ac00e3"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'UAT-ACFS-KEY-01' && params.Region == 'USW2') {
+                                key="arn:aws:kms:us-west-2:699183880494:key/mrk-ac0af9a524d64df88d871ed417dff7ea"
+                                echo "${key} is KMS key ARN" 
+                        } else if (params.Key_Name == 'DEV-KENSTAR-KEY-01' && params.Region == 'USE1') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/8228a199-7742-4686-9474-47565f6047e1"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'QA-KENSTAR-KEY-01' && params.Region == 'USE1') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/mrk-03253899fb5d4004b0a0e3a8004bc188"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'UAT-KENSTART-KEY-01' && params.Region == 'USE1') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/1c8ebdfa-04e7-4eb8-9722-145aa722997f"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'QA-KENSTAR-KEY-01' && params.Region == 'USW2') {
+                                key="arn:aws:kms:us-west-2:699183880494:key/mrk-03253899fb5d4004b0a0e3a8004bc188"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'DEV-GRIP-KEY-01' && params.Region == 'USE1') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/f3ab43b0-f5a5-4cef-864f-1be3ee9c86d2"
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'QA-GRIP-KEY-01' && params.Region == 'USE1') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/4128c6ba-9181-410d-8b2b-c129d1b98c4b"
+                                echo "${key} is KMS key ARN"  
+                        }  else if (params.Key_Name == 'UAT-GRIP-KEY-01' && params.Region == 'USE1') {
+                                key=""
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'DEV-GRIP-KEY-01' && params.Region == 'USW2') {
+                                key=""
+                                echo "${key} is KMS key ARN"
+                        }  else if (params.Key_Name == 'QA-GRIP-KEY-01' && params.Region == 'USW2') {
+                                key="arn:aws:kms:us-west-2:699183880494:key/0a364152-d042-464e-bb97-9d1c7cd5df9b"
+                                echo "${key} is KMS key ARN"  
+                        }  else if (params.Key_Name == 'UAT-GRIP-KEY-01' && params.Region == 'USW2') {
+                                key=""
+                                echo "${key} is KMS key ARN"  
+                        }  else if (params.Key_Name == 'QA-SCORE-KMS' && params.Region == 'USE1') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/695bba37-ad20-4861-a18a-5ca0babee128"
+                                echo "${key} is KMS key ARN"  
+                        }  else if (params.Key_Name == 'DEV-SCORE-KMS' && params.Region == 'USE1') {
+                                key="arn:aws:kms:us-east-1:699183880494:key/ab194983-d7b2-4103-9abf-82e2d2745127"
+                                echo "${key} is KMS key ARN"  
+			}
+                }
+        }
+
+
+        //new code. 
+        void kms_arn() {
+                script {
+                       sh """
+                       sh  ${JENKINS_HOME}/workspace/${Job_Name}/scripts/ssm/key_arn.sh "$params.Environment" "$params.APP" $region > /var/tmp/key_arn
+                       """
+                       key = readFile("/var/tmp/key_arn").trim()
+                       echo "${key} is key arn of  ${params.Environment} ${params.APP}"
+                  }
+        }
+
+
+        void audit() {
+                script {
+                        wrap([$class: 'BuildUser']) {
+                                BUILD_USER="${BUILD_USER}"
+                                //echo "${BUILD_USER} is build user name"
+                                BUILD_USER_MAIL_ID="${BUILD_USER_EMAIL}"
+                                //echo "${BUILD_USER_EMAIL} is build user mail id"
+                        }
+
+                }
+        }
+        void stackvars() {
+                script {
+                        if ( params.BuildNumber == '' ){  
+                                rgn()
+                                build_number="${currentBuild.number}"
+                                Name="${params.Environment}/${params.REGION}/${APP}/${params.ParameterName}"
+                                echo "${envapp} is the Enviroment/Region/ApplicationName"
+                                echo "${build_number} is defaut buildnumber of the job"
+                        }        
+                }
+        }
+
+        void secret() {
+		script {
+			Password = "${params.ParameterValue}"
+			wrap([$class: 'MaskPasswordsBuildWrapper',varPasswordPairs: [[password: Password]]]){
+			echo 'Retrieve Secret: ' +  Password
+			echo Password
+			}
+		}
+	}
+   
+        void AppID() {
+                script {
+                        if (APP == 'INFRA' || APP == 'INFRATEST') {
+                                appid="EEA3AA80-35D5-4C84-8403-39761A7215B8"
+                                echo "${appid}"
+                        } else if (APP == 'ACFS' ) {
+                                appid="3857424C-3C29-44C9-ACEA-890FC0453DD4"
+                                echo "${appid}"
+                        } else if (APP == 'ARROW' || APP =='ARROW-SPRINGBOOT' || APP == 'SPDJI-ETL-SERVICES' ) {
+                                appid="C8B7BC4B-94FB-47C0-896A-654BAD846352"
+                                echo "${appid}"
+                        } else if (APP == 'CARE' ) {
+                                appid="1478EE8A-20BC-4174-BACD-35D9E61A3F73"
+                                echo "${appid}" 
+                        } else if (APP == 'FIERCE' ) {
+                                appid="7E374DE9-B74B-4D9D-B8BE-90651B121247"
+                                echo "${appid}"  
+                        } else if (APP == 'GRIP' ) {
+                                appid="CF77E891-9E1B-4C12-924E-7BBAA8FFBA04"
+                                echo "${appid}" 
+                        } else if (APP == 'IDS' ) {
+                                appid="95A37131-CEBF-4969-9D54-36BBA741B91F"
+                                echo "${appid}" 
+                        } else if (APP == 'KENSTAR' ) {
+                                appid="403A115B-3E7F-4163-BE88-D67982C6B566"
+                                echo "${appid}" 
+                        } else if (APP == 'MDB' ) {
+                                appid="27932A31-F152-45C4-AB96-C933C978418B"
+                                echo "${appid}" 
+                        } else if (APP == 'SPDJIBLOGS' ) {
+                                appid="7DAA4397-2B13-4F25-BA54-EC647B6101C7"
+                                echo "${appid}" 
+                        } else if (APP == 'SPDJIVAULT' ) {
+                                appid="38E79B25-A900-4FA9-A53B-B5AF470B96EE"
+                                echo "${appid}" 
+                        } else if (APP == 'SPICE' || APP == 'PPM' ) {
+                                appid="1D43A9C7-5289-427C-A6C5-9ABD48C32C1A"
+                                echo "${appid}" 
+                        } else if (APP == 'SPIDER' ) {
+                                appid="0ACC151C-439E-415A-9794-7C42C13A551D"
+                                echo "${appid}" 
+                        } else if (APP == 'T3' ) {
+                                appid="F1D97E8B-2BA2-47AE-92A7-198C99A595D9"
+                                echo "${appid}" 
+                        } else if (APP == 'RIPA' ) {
+                                appid="C4E7876D-1BF6-0090-868C-A8E82D4BCBCD"
+                                echo "${appid}" 
+                        } else if (APP == 'SPROUT' ) {
+                                appid="684E921D-1B85-7850-DB44-20AA234BCB61"
+                                echo "${appid}" 
+                        } else if (APP == 'SCORE' ) {
+                                appid="3BCC8BF8-DBD3-9450-7836-BC32BA961907"
+                                echo "${appid}"     
+                        } else if (APP == 'RIPA') {
+                                appid="DDF7559D-DBF8-C8D0-3D0A-8C92399619A7"
+                                echo "${appid}"
+                        } else if (APP == 'FI3') {
+                                appid="95CE697C-1B09-A158-704B-997A234BCB26"
+                                echo "${appid}"
+                        } else if (APP == 'RIPACALC') {  
+                                appid="C4E7876D-1BF6-0090-868C-A8E82D4BCBCD"
+                                echo "${appid}"                                                                                                          
+               }
+             }
+           }
+  
+void mail_list() {
+    script {
+        def Application = "${params.APP}".split("-")[0]
+        def APPENV = "$Application${params.Environment}"
+        if ( APPENV != '' ){ 
+            dl_map = [
+                "ACFSDEV": "ACFSDev@spglobal.com", "ACFSQA": "ACFSQA@spglobal.com", "ACFSUAT": "ACFSQA@spglobal.com", "ACFSPROD": "ACFSSupport@spglobal.com", "ACFSDR": "ACFSSupport@spglobal.com",
+                "ARROWDEV": "arrowdevteam@spglobal.com", "ARROWQA": "SPDJIITQA@spdji.com", "ARROWUAT": "SPDJIITQA@spdji.com", "ARROWPROD": "ARROWSupport@spglobal.com", "ARROWDR": "ARROWSupport@spglobal.com",
+                "AURADEV": "AURAdev@spglobal.com", "AURAQA": "SPDJIITQA@spdji.com", "AURAPROD": "AURAsupport@spglobal.com", "AURADR": "AURAsupport@spglobal.com", 
+                "CAREDEV": "CareDevTeam@spglobal.com", "CAREQA": "CareQA@spglobal.com", "CAREPROD": "CARE_Support@spglobal.com", "CAREDR": "CARE_Support@spglobal.com",
+                "CIPDEV": "CIP_TEAM@spglobal.com", "CIPQA": "CIP_TEAM@spglobal.com", "CIPPREPROD": "CIPSupport@spglobal.com", "CIPPROD": "CIPSupport@spglobal.com", "CIPDR": "CIPSupport@spglobal.com", 
+                "FIERCEDEV": "FIERCEDevelopment@spglobal.com", "FIERCEDEV2": "FIERCEDevelopment@spglobal.com", "FIERCEQA": "FierceQATeam@spglobal.com", "FIERCEQA2": "FierceQATeam@spglobal.com", "FIERCEUAT": "FierceQATeam@spglobal.com", "FIERCEUAT2": "FierceQATeam@spglobal.com","FIERCEPROD": "FIERCESupport@spglobal.com", "FIERCEDR": "FIERCESupport@spglobal.com",
+		"SPROUTDEV": "SPROUTDEV@spglobal.com", "SPROUTQA": "SPROUTQATEam@spglobal.com", "SPROUTUAT": "SPROUTQATEam@spglobal.com", "SPROUTPROD": "sproutsupport@spglobal.com", "SPROUTDR": "sproutsupport@spglobal.com",
+                "GRIPDEV": "GRIPDev@spglobal.com", "GRIPQA": "GRIPQA@spglobal.com", "GRIPPROD": "GRIPSupport@spglobal.com", "GRIPDR": "GRIPSupport@spglobal.com",
+                "INFRATESTDEV": "d.kethavath@spglobal.com", "INFRATESTQA": "kirubakaran.kannan@spglobal.com", "INFRATESTUAT": "kirubakaran.kannan@spglobal.com",
+                "INFRADEV": "d.kethavath@spglobal.com", "INFRAQA": "kirubakaran.kannan@spglobal.com", "INFRAUAT": "kirubakaran.kannan@spglobal.com", 
+                "INFRAPROD": "kirubakaran.kannan@spglobal.com", "INFRDR": "kirubakaran.kannan@spglobal.com", 
+                "IDSDEV": "IDSDevelopmentTeam@spglobal.com", "IDSQA": "IDSQATeam@spglobal.com", "IDSUAT": "IDSQATeam@spglobal.com", "IDSPROD": "IDSSupport@spglobal.com", "IDSDR": "IDSSupport@spglobal.com",
+                "ILSDEV": "ILSDev@spglobal.com", "ILSQA": "ILSQA@spglobal.com", "ILSPROD": "ILSSupport@spglobal.com",
+                "KENSTARDEV": "KenstarDev@spglobal.com", "KENSTARQA": "KenstarQA@spglobal.com", "KENSTARUAT": "KenstarQA@spglobal.com", "KENSTARPROD": "KenstarSupport@spglobal.com", "KENSTARDR": "KenstarSupport@spglobal.com",
+		"KENSTARDEV2": "KenstarDev@spglobal.com","KENSTARQA2": "KenstarQA@spglobal.com", "KENSTARUAT2": "KenstarQA@spglobal.com", "KENSTARPREPROD2": "KenstarSupport@spglobal.com", "KENSTARPROD2": "KenstarSupport@spglobal.com", "KENSTARDR2": "KenstarSupport@spglobal.com",
+                "MDBDEV": "MDBTeam@spglobal.com", "MDBQA": "MDBTeam@spglobal.com", "MDBUAT": "MDBTeam@spglobal.com", "MDBPROD": "MDBTeam@spglobal.com", "MDBDR": "MDBSupport@spglobal.com", 
+                "SCOREDEV": "scoredev@spglobal.com", "SCOREQA":"SPDJIITQA@spdji.com", "SCOREPROD": "scoredev@spglobal.com", "SCOREDR": "scoredev@spglobal.com",
+                "SPDJIBLOGSDEV": "IDSDevelopmentTeam@spglobal.com", "SPDJIBLOGSQA": "SPDJIITQA@spdji.com", "SPDJIBLOGSUAT": "SPDJIITQA@spdji.com", "SPDJIBLOGSPROD": "spdjiblogssupport@spglobal.com", "SPDJIBLOGSDR": "spdjiblogssupport@spglobal.com",
+                "SPDJIVAULTDEV": "IDSDevelopmentTeam@spglobal.com", "SPDJIVAULTQA": "SPDJIITQA@spdji.com", "SPDJIVAULTPROD": "spdjiblogssupport@spglobal.com", "SPDJIVAULTDR": "spdjiblogssupport@spglobal.com",
+                "SPIDERDEV": "SpiderDevelopment@spglobal.com", "SPIDERQA": "SpiderQA@spglobal.com", "SPIDERPREPROD": "SPIDERSupport@spglobal.com", "SPIDERPROD": "SPIDERSupport@spglobal.com", "SPIDERDR": "SPIDERSupport@spglobal.com",
+		"T3DEV1": "T3DevelopmentTeam@spglobal.com", "T3DEV2": "T3DevelopmentTeam@spglobal.com", "T3QA1": "T3QATeam@spglobal.com", "T3QA2": "T3QATeam@spglobal.com", "T3PRODFIX": "T3QATeam@spglobal.com", "T3PREPROD1": "T3support@spglobal.com", "T3PREPROD": "T3support@spglobal.com", "T3PROD": "T3support@spglobal.com", "T3DR": "T3support@spglobal.com"]
+                
+            mail_id = dl_map.find{ it.key == APPENV }?.value
+	    echo "${mail_id} is mail ID valrable value in mail function"
+        }
+        else {
+            echo "Please ensure to select Application and Environment"
+
+        }
+    }
+}

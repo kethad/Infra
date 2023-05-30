@@ -1,0 +1,880 @@
+pipeline {
+    //agent{ label "${params.Slave}" }
+      agent{ label ' USE1-SLAVE-01 || USW2-SLAVE-01 ' }
+
+    stages {
+        
+         stage('Print Parameters') {
+            
+            steps {
+            echo "  ${params.ENVIRONMENT} ${params.REGION} ${params.APP} ${params.AMI} ${params.InputBuildNumber} ${params.Create} ${params.Destroy} ${params.Slave} "
+            }
+        }
+
+         stage('Incorrect Selection - VirtualMachine & Decommission') {
+             when {
+                expression { params.Create == 'VirtualMachine' }
+                expression { params.Destroy == 'Decommission' }
+            }
+             
+             steps {
+              
+                 echo " 'VirtualMachine' 'Decommission' can't be selected together "
+                 sh 'exit 1'
+             }
+         }
+         
+         stage('Incorrect Selection - Decommission-DoNot-CombineWithOther-STAGES') {
+              when {
+                     expression  { params.Create == 'VirtualMachine,LoadBalancer,UpdateDNS' }
+                     expression  { params.Destroy == 'Decommission' }
+                     
+                   }
+            steps { 
+                  
+                    echo "Please Don't combine 'Decommission' with Other Creation STAGES like 'VirtualMachine' 'LoadBalancer' 'UpdateDNS' "
+                    sh 'exit 1'
+            }
+        }        
+        
+         stage('Incorrect Selection - Decommission-without-InputBuildNumber') {
+             when {
+                expression { params.Destroy == 'Decommission' }
+                expression { params.InputBuildNumber == '' }
+            }
+             
+             steps {
+              
+                 echo " Plase Provide the InputBuildNumber as it is must for 'Decommission' "
+                 sh 'exit 1'  
+             }
+         }
+
+        stage('Incorrect Selection - LoadBalancer-without-InputBuildNumber') {
+              when {
+                     expression  { params.Create == 'LoadBalancer' }
+                     expression { params.InputBuildNumber == '' }  
+                   }
+                   
+            steps { 
+                  
+                    echo "Plase Provide the InputBuildNumber as it is must for 'LoadBalancer' Setup  "
+                    sh 'exit 1'
+                }
+            }
+            
+            stage('Incorrect Selection - UpdateDNS-without-InputBuildNumber') {
+              when {
+                     expression  { params.Create == 'UpdateDNS' }
+                     expression { params.InputBuildNumber == '' }  
+                   }
+                   
+            steps { 
+                  
+                    echo " Plase Provide the InputBuildNumber as it is must for 'UpdateDNS' "
+                    sh 'exit 1'
+                }
+            }
+
+         stage('Incorrect Selection - ALL-with-InputBuildNumber') {
+              when {
+                     expression  { params.Create == 'VirtualMachine,LoadBalancer,UpdateDNS' }
+                     expression  { params.InputBuildNumber != '' }
+                   }
+                   
+            steps { 
+                  
+                    echo " Please don't provide 'InputBuildNumber' along with 'VirtualMachine' 'LoadBalancer' 'UpdateDNS' as it's not needed "
+                    sh 'exit 1'
+            }
+        }
+        
+         stage('Create VirtualMachine') {
+              when {
+                     expression  { params.Create == 'VirtualMachine' }
+                     expression  { params.InputBuildNumber == '' } 
+                   }
+		   environment {
+		ansi_pass = credentials('winss_pass_test')
+	    }
+                   
+            steps { 
+                  
+                    echo " VirtualMachine Related Playbooks will be executed..."
+                    echo "${params.Create} is the Selected Stage"
+                    scripthost()
+                    dp_buildnumber()
+		    ENV()
+                    INFRAProvisioningPostprovisioning()
+                }
+        }
+             
+         stage('Destroy VirtualMachine') {
+              when {
+                     expression  { params.Destroy == 'Decommission' }
+                     expression { params.InputBuildNumber != '' }  
+                   }
+                   
+            steps { 
+                  
+                    echo " Decommission related playbooks will be executed "
+                    echo "${params.Destroy} is the Selected Stage"
+                    scripthost()
+                    dp_buildnumber()
+                    deletion()
+                }
+            }
+
+            stage('Create LoadBalancer based on BuildNumber') {
+              when {
+                     expression  { params.Create == 'LoadBalancer' }
+                     expression { params.InputBuildNumber != '' }  
+                   }
+                   
+            steps { 
+                  
+                    echo " Only LoadBalancer Related Playbooks will be executed "
+                    echo "${params.Create} is the Selected Stage"
+                    scripthost()
+                    dp_buildnumber()
+		    ENV()
+                    //IPsfetch()
+                    LoadBalancer()
+                }
+            }
+            
+            stage('UpdateDNS based on BuildNumber') {
+            
+              when {
+                     expression  { params.Create == 'UpdateDNS' }
+                     expression { params.InputBuildNumber != '' }  
+                   }
+                   
+            steps { 
+                  
+                    echo " Only UpdateDNS Related Playbooks will be executed "
+                    echo "${params.Create} is the Selected Stage"
+                    scripthost()
+                    dp_buildnumber()
+                    UpdateDNS()  
+                }
+            }
+
+            stage('Create VirtualMachine with LoadBalancer') {
+              when {
+                     expression  { params.Create == 'VirtualMachine,LoadBalancer' }
+                     expression  { params.InputBuildNumber == '' }
+                   }
+                   
+            steps { 
+                  
+                    echo " 'VirtualMachine' 'LoadBalancer' Playbooks will be executed in sequence "
+                    echo "${params.Create} is the Selected Stage"
+                    scripthost()
+                    dp_buildnumber()
+		    ENV()
+                    INFRAProvisioningPostprovisioning()
+                    LoadBalancer()      
+            }
+        }
+        
+          stage('Create LoadBalancer and UpdateDNS based on BuildNumber') {
+              when {
+                     expression  { params.Create == 'LoadBalancer,UpdateDNS' }
+                     expression  { params.InputBuildNumber != '' }
+                   }
+                   
+            steps { 
+                  
+                    echo " 'VirtualMachine' 'LoadBalancer' Playbooks will be executed in sequence "
+                    echo "${params.Create} is the Selected Stage"
+                    scripthost()
+                    dp_buildnumber()
+		    ENV()
+                    LoadBalancer()
+                    UpdateDNS()                
+               }
+           }
+                        
+            stage('Create Virtual Machine, LoadBalancer and UpdateDNS') {
+              when {
+                     expression  { params.Create == 'VirtualMachine,LoadBalancer,UpdateDNS' }
+                     expression  { params.InputBuildNumber == '' }
+                   }
+                   
+            steps { 
+                  
+                    echo " 'VirtualMachine' 'LoadBalancer' 'UpdateDNS' Playbooks will be executed in sequence "
+                    echo "${params.Create} is the Selected Stage"
+                    scripthost()
+                    dp_buildnumber()
+		    ENV()
+                    INFRAProvisioningPostprovisioning()
+                    LoadBalancer()
+                    UpdateDNS()                  
+            }
+        }            
+            
+  }
+    post {
+
+        failure {          
+            script {
+
+                mail_list()
+		if ( params.Create == 'VirtualMachine' ) {
+		scripthost()
+		dp_buildnumber()
+		deletionFL()
+		} else if  ( params.Create == 'VirtualMachine,LoadBalancer,UpdateDNS' ) {
+		scripthost()
+                dp_buildnumber()
+                deletionFL()
+		} else if ( params.Create == 'VirtualMachine,LoadBalancer' ) {
+		scripthost()
+                dp_buildnumber()
+                deletionFL()
+		}
+		
+                if (mail_id) {
+
+                    mail to: "${mail_id},IndexInfraMBX@spglobal.com",
+                    subject: "SPDJI EC2Stack: New ${environment} VM Deployment Failed for ${params.APP} APP Build Number ${env.BUILD_NUMBER}",
+                    body: "New ${params.Create} Deployment Failed for ${params.ENVIRONMENT} Environment ${params.APP} APP, for more details click on the url ${env.BUILD_URL}console"
+                }
+                
+                else {
+
+                    mail to: 'IndexInfraMBX@spglobal.com',
+                    subject: "SPDJI EC2Stack: New ${environment} VM Deployment Failed for ${params.APP} APP Build Number ${env.BUILD_NUMBER}",
+                    body: "New ${params.Create} Deployment Failed for ${params.ENVIRONMENT} Environment ${params.APP} APP, for more details click on the url ${env.BUILD_URL}console. Please share the details to corresponding Platform DL List as we don't find the appropriate mailing DL to send the message"
+                    }
+                }
+        }
+        
+        success {          
+           script {
+             if ( params.Create == 'VirtualMachine' ) {
+
+                 mail_list()
+                 if (mail_id) {
+
+                     mail to: "${mail_id},IndexInfraMBX@spglobal.com",
+                     subject: "SPDJI EC2Stack: New ${environment} VM Deployment Completed for ${params.APP} APP BuildNumber ${env.BUILD_NUMBER}",
+                     body: "New VM Deployment completed for ${environment} Environment ${params.APP} APP,  Instances IP's are ${IPS}, for more details click on the url ${env.BUILD_URL}console"
+                     }
+                     
+                     else {
+
+                         mail to: 'IndexInfraMBX@spglobal.com',
+                         subject: "SPDJI EC2Stack: New ${environment} VM Deployment Completed for ${params.APP} APP BuildNumber ${env.BUILD_NUMBER}",
+                         body: "New VM Deployment completed for ${environment} Environment ${params.APP} APP,  Instances IP's are ${IPS}, for more details click on the url ${env.BUILD_URL}console. Please share the details to corresponding Platform DL List as we don't find the appropriate mailing DL to send the message"
+                         }
+                         
+                } else if (  params.Create == 'VirtualMachine,LoadBalancer' ) {
+                    
+                    mail_list()
+                    if (mail_id) {
+
+                        mail to: "${mail_id},IndexInfraMBX@spglobal.com",
+                        subject: "SPDJI EC2Stack: New ${environment} VM Deployment Completed for ${params.APP} APP BuildNumber ${env.BUILD_NUMBER}",
+                        body: "New VM Deployment completed for ${environment} Environment ${params.APP} APP,  Instances IP's are ${IPS}, ALB DNS Name is ${ALB_DNS_NAME} for more details click on the url ${env.BUILD_URL}console"
+                        }
+                        
+                        else {
+
+                            mail to: 'indexinfrastructure@spglobal.com',
+                            subject: "SPDJI EC2Stack: New ${environment} VM Deployment Completed for ${params.APP} APP BuildNumber ${env.BUILD_NUMBER}",
+                            body: "New VM Deployment completed for ${environment} Environment ${params.APP} APP,  Instances IP's are ${IPS}, ALB DNS Name is ${ALB_DNS_NAME} for more details click on the url ${env.BUILD_URL}console. Please share the details to corresponding Platform DL List as we don't find the appropriate mailing DL to send the message"
+                            }               
+
+               } else if (  params.Create == 'VirtualMachine,LoadBalancer,UpdateDNS' ) {
+
+                   mail_list()
+                   if (mail_id) {
+
+                       mail to: "${mail_id},IndexInfraMBX@spglobal.com",
+                       subject: "SPDJI EC2Stack: New ${environment} VM Deployment Completed for ${params.APP} APP BuildNumber ${env.BUILD_NUMBER}",
+                       body: "New VM Deployment, ALB Provisioning , DNS Records Updation Completed for ${environment} Environment ${params.APP} APP, Instances IP's are ${IPS}, ALB DNS Name is ${ALB_DNS_NAME}, Route53 Records are ${LB_DNS} and Host DNS Names are ${HOST_DNS}, for more details click on the url ${env.BUILD_URL}console" 
+                       }
+                       
+                       else {
+
+                           mail to: 'indexinfrastructure@spglobal.com',
+                           subject: "SPDJI EC2Stack: New ${environment} VM Deployment Completed for ${params.APP} APP BuildNumber ${env.BUILD_NUMBER}",
+                           body: "New VM Deployment completed for ${environment} Environment ${params.APP} APP,  Instances IP's are ${IPS}, ALB DNS Name is ${ALB_DNS_NAME}, Route53 Records are ${LB_DNS} and Host DNS Names are ${HOST_DNS} for more details click on the url ${env.BUILD_URL}console. Please share the details to corresponding Platform DL List as we don't find the appropriate mailing DL to send the message"
+                           }
+                           
+               } else if (  params.Destroy == 'Decommission' ) {
+
+                   mail_list()
+                   if (mail_id) {
+                       mail to: "${mail_id},IndexInfraMBX@spglobal.com",
+                       subject: "SPDJI EC2Stack: New ${environment} VM Deployment Completed for ${params.APP} APP BuildNumber ${env.BUILD_NUMBER}",
+                       body: "Resources Deletion is Successful for ${environment} Environment ${params.APP} APP ${BUILD_NUMBER} BuildNumber , for more details click on the url ${env.BUILD_URL}console"  
+                       }
+                       
+                       else {
+
+                           mail to: 'indexinfrastructure@spglobal.com',
+                           subject: "SPDJI EC2Stack: New ${environment} VM Deployment Completed for ${params.APP} APP BuildNumber ${env.BUILD_NUMBER}",
+                           body: "Resources Deletion is Successful for ${environment} Environment ${params.APP} APP ${BUILD_NUMBER} BuildNumber , for more details click on the url ${env.BUILD_URL}console.  Please share the details to corresponding Platform DL List as we don't find the appropriate mailing DL to send the message"
+                           }
+                      
+               } else if (  params.Create == 'LoadBalancer' ) {
+               
+                   mail_list()
+                   if (mail_id) {
+                       mail to: "${mail_id},IndexInfraMBX@spglobal.com",
+                       subject: "SPDJI EC2Stack: New ${environment} VM Deployment Completed for ${params.APP} APP BuildNumber ${env.BUILD_NUMBER}",
+                       body: "ALB Provisioning Completed for ${environment} Environment ${params.APP} APP, ALB DNS Name is ${ALB_DNS_NAME}, for more details click on the url ${env.BUILD_URL}console" 
+                       }
+                       
+                       else {
+
+                           mail to: 'indexinfrastructure@spglobal.com',
+                           subject: "SPDJI EC2Stack: New ${environment} VM Deployment Completed for ${params.APP} APP BuildNumber ${env.BUILD_NUMBER}",
+                           body: "ALB Provisioning Completed for ${environment} Environment ${params.APP} APP, ALB DNS Name is ${ALB_DNS_NAME}, for more details click on the url ${env.BUILD_URL}console. Please share the details to corresponding Platform DL List as we don't find the appropriate mailing DL to send the message"
+                           }
+                       
+               } else if (  params.Create == 'LoadBalancer,UpdateDNS' ) {
+               
+                    mail_list()
+                    if (mail_id) {
+                       mail to: "${mail_id},IndexInfraMBX@spglobal.com",
+                       subject: "SPDJI EC2Stack: New ${environment} VM Deployment Completed for ${params.APP} APP BuildNumber ${env.BUILD_NUMBER}",
+                       body: "ALB Provisioning , DNS Records Updation Completed for ${environment} Environment ${params.APP} APP, ALB DNS Name is ${ALB_DNS_NAME}, Route53 Records are  ${LB_DNS}, Host DNS Names are  ${HOST_DNS}, for more details click on the url ${env.BUILD_URL}console" 
+                       }
+                       
+                       else {
+
+                           mail to: 'indexinfrastructure@spglobal.com',
+                           subject: "SPDJI EC2Stack: New ${environment} VM Deployment Completed for ${params.APP} APP BuildNumber ${env.BUILD_NUMBER}",
+                           body: "ALB Provisioning , DNS Records Updation Completed for ${environment} Environment ${params.APP} APP, ALB DNS Name is ${ALB_DNS_NAME}, Route53 Records are  ${LB_DNS}, Host DNS Names are  ${HOST_DNS}, for more details click on the url ${env.BUILD_URL}console. Please share the details to corresponding Platform DL List as we don't find the appropriate mailing DL to send the message"
+                           }
+
+               } else if (  params.Create == 'UpdateDNS' ) {
+                     
+                    mail_list()
+                    if (mail_id) {
+                       mail to: "${mail_id},IndexInfraMBX@spglobal.com",
+                       subject: "SPDJI EC2Stack: New ${environment} VM Deployment Completed for ${params.APP} APP BuildNumber ${env.BUILD_NUMBER}",
+                       body: "DNS Records Updated for ${environment} Environment ${params.APP} APP , DNS Records are ${LB_DNS}, Host DNS Names are ${HOST_DNS}, for more details click on the url ${env.BUILD_URL}console" 
+                       }
+                       
+                       else {
+
+                           mail to: 'indexinfrastructure@spglobal.com',
+                           subject: "SPDJI EC2Stack: New ${environment} VM Deployment Completed for ${params.APP} APP BuildNumber ${env.BUILD_NUMBER}",
+                           body: "DNS Records Updated for ${environment} Environment ${params.APP} APP , DNS Records are ${LB_DNS}, Host DNS Names are ${HOST_DNS}, for more details click on the url ${env.BUILD_URL}console. Please share the details to corresponding Platform DL List as we don't find the appropriate mailing DL to send the message"
+                           }
+               }
+                 else {
+                     
+                     mail_list()
+                         mail to: "${mail_id},IndexInfraMBX@spglobal.com",
+                         subject: "SPDJI EC2Stack: Please provide valid Parameters for: ${environment} Environment ${params.APP} APP",
+                         body: "SPDJI EC2Stack: Please provide valid Parameters for: ${environment} Environment ${params.APP} APP"
+                       }
+               }
+           }
+        }
+}  
+
+void INFRAProvisioningPostprovisioning() {
+
+       wrap([$class: 'BuildUser']) {
+          echo "${p_build_number} is build_number"
+          //Provisioning Playbook exection i.e AWS_EC2_Master.yml//
+                script {             
+                    dp_buildnumber()
+                    ansiblePlaybook ([
+                      credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',
+                      playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/AWS/AWS_EC2_Master.yml',
+                      extras: "-e OS=${OS} -e ENVIRONMENT=${environment} -e ENVAPP=${envapp}\
+                               -e REGION=${REGION} -e AMI=${params.AMI} -e APP=${params.APP}\
+                               -e ENV=${ENV} -e BUILD_NUMBER=${currentBuild.number}\
+                               -e REG=${REG} -e BuildTUserML=${BUILD_USER_EMAIL} -e T3ENVIRONMENT=${params.ENVIRONMENT}"
+                               ])             
+                               
+                    IPsfetch()
+                    sleep 60
+		    
+		    if ( params.AMI == 'WINDOWS19-CurrentMonth' ) {
+                      ansiblePlaybook ([
+                      credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',
+                      playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/windows_domain.yml',
+                      extras: "-e OS=${OS} -e ENVIRONMENT=${environment} -e ENVAPP=${envapp}\
+                               -e REGION=${REGION} -e AMI=${params.AMI} -e APP=${params.APP}\
+                               -e ENV=${ENV} -e BUILD_NUMBER=${currentBuild.number}\
+                               -e REG=${REG} -e BuildTUserML=${BUILD_USER_EMAIL} -e ENVIRONMENTTAG=${params.ENVIRONMENT} -e HOSTS=${IPS}"
+                               ])
+                    }            
+		 
+
+                    //Post-Provisioning Playbook exection i.e EC2_PostProvisioning.yml//
+                    if ( "${OS}" == 'RHEL8' || "${OS}" == 'RHEL7'  ) {
+                    ansiblePlaybook ([ 
+                                  credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',
+                                  inventory: "/tmp/inventoryfile-${envapp}-${p_build_number}", 
+                                  playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/EC2_PostProvisioning.yml',   
+                                  extras: "-e ansible_python_interpreter=/usr/libexec/platform-python -e REGION=${REG} -e ENVAPP=${envapp} -e ENVIRONMENT=${environment} -e ENVIRONMENTTAG=${environmenttag}\
+                                          -e APP=${params.APP} -e BUILD_NUMBER=${p_build_number} -e SCRIPTHOST=${SCRIPTHOST} -e HOSTS=${IPS}"
+                                          ])
+                      }
+                    if ( params.AMI == 'WINDOWS19-CurrentMonth' ) {       
+                                ansiblePlaybook ([ 
+                                  credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',
+                                  inventory: "/home/anscm/ansible_winrm", 
+                                  playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/EC2_Win_Provisioning.yml',   
+                                  extras: "-e ansible_python_interpreter=/usr/libexec/platform-python -e REGION=${REG} -e ENVAPP=${envapp} -e ENVIRONMENT=${environment} -e ENVIRONMENTTAG=${environmenttag}\
+                                          -e APP=${params.APP} -e BUILD_NUMBER=${p_build_number} -e SCRIPTHOST=${SCRIPTHOST} -e HOSTS=${IPS} -e ansiblepassword=$ansi_pass"
+					  ])
+                    }       
+                    }
+        }  
+}
+
+void dp_buildnumber() {
+    script {
+                   //this function is for deciding the build_number is user input build_number or pipelinejob build_number//                     
+                    if ( params.InputBuildNumber == '' ){      
+                         p_build_number="${currentBuild.number}"
+                         Job_Name="${env.JOB_NAME}"
+                         environmenttag="${ENVIRONMENT}"
+                         echo "${environmenttag} is the Environment for resources tag"
+                         environment="${params.ENVIRONMENT}-${params.REGION}"
+                         envapp="${environment}-${params.APP}"
+                         echo "${environment} is the Environment with Region"
+                         echo "${params.APP} is the App Name Selected"
+                         echo "${envapp} is the Environment-Region-AppName"
+                         echo "${p_build_number} is pipelinebuildnumber"
+                         
+                    } else {   
+                    
+                        p_build_number="${params.InputBuildNumber}"
+                        Job_Name="${env.JOB_NAME}"
+                        environmenttag="${ENVIRONMENT}"
+                        echo "${environmenttag} is the Environment for resources tag"
+                        environment="${params.ENVIRONMENT}-${params.REGION}"
+                        envapp="${environment}-${params.APP}"
+                        echo "${environment} is the Environment with Region"
+                        echo "${params.APP} is the App Name Selected"
+                        echo "${envapp} is the Environment-Region-AppName"
+                        echo "${p_build_number} is pipelinebuildnumber"
+                                                                   
+                    }
+                    if( params.AMI == 'RHEL7-CurrentMonth' || params.AMI == 'RHEL7-PreviousMonth' ) {
+                        OS = "RHEL7"
+                        echo "Selected AMI is $OS"
+                    }
+                    else if ( params.AMI == 'RHEL8-PreviousMonth' || params.AMI == 'RHEL8-CurrentMonth' ) {
+                        OS = "RHEL8"
+                        echo "Selected AMI is $OS"
+                    }
+		                else if ( params.AMI == 'WINDOWS19-CurrentMonth' ) {
+                        OS = "WINDOWS19"
+                        echo "Selected AMI is $OS"
+                    }
+
+                    else {
+                        echo "No AMI is selected"
+                    }
+                    
+                    if( params.ENVIRONMENT == 'PROD' || params.ENVIRONMENT == 'PROD2' ) {
+                         ENV="PROD"
+                         echo "Selected Environment is ${params.ENVIRONMENT} and trimmed ENV in Jenkins file is ${ENV}"
+                      } else if ( params.ENVIRONMENT == 'DR' || params.ENVIRONMENT == 'DR2' ) {
+                          ENV="DR"
+                          echo "Selected Environment is ${params.ENVIRONMENT} and trimmed ENV in Jenkins file is ${ENV}"
+                      } else if ( params.ENVIRONMENT == 'PREPROD' || params.ENVIRONMENT == 'PREPROD1' || params.ENVIRONMENT == 'PREPROD2' ) {
+                          ENV="PREPROD"
+                          echo "Selected Environment is ${params.ENVIRONMENT} and trimmed ENV in Jenkins file is ${ENV}"
+                      } else {
+                          echo "No Environment is selected"
+                     }
+		    
+                    if ( params.REGION == 'USE1') {
+                        REG = "us-east-1"
+                        echo "Selected Region is $REG"
+                    }
+                    else if ( params.REGION == 'USW2') {
+                        REG = "us-west-2"
+                        echo "Selected Region is $REG"
+                    }
+                    else if ( params.REGION == 'EUW1') {
+                        REG = "eu-west-1"
+                        echo "Selected Region is $REG"
+                    }                    
+		    
+            }
+}
+
+
+void ENV() {
+    script {
+          sh '''
+	    echo "ENV"
+	    '''
+           }
+}
+
+void scripthost() {
+    script {
+             if ( params.ENVIRONMENT == 'PROD' || params.ENVIRONMENT == 'PREPROD' || params.ENVIRONMENT == 'DR' ) {
+               SCRIPTHOST = "prod.infra.spdji.com"
+             } else if (  params.ENVIRONMENT == 'DR2' || params.ENVIRONMENT == 'PREPROD2' ) {
+               SCRIPTHOST = "dr.infra.spdji.com"
+             } 
+               else {
+                SCRIPTHOST = "infra.spdji.com"
+             }
+    
+           }
+}
+
+void IPsfetch() {
+
+      ansiblePlaybook credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',extras: "-e POSTPARM=${params.Create} -e ENVAPP=${envapp} -e ENVIRONMENT=${environment} -e APP=${params.APP} -e BUILD_NUMBER=${p_build_number} -e SCRIPTHOST=${SCRIPTHOST}",  installation: 'ansible-2.6.5', playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/cicd-infra.hosts.yml'
+      IPS = readFile("/tmp/hosts-${envapp}-${p_build_number}")
+}
+
+void LoadBalancer() {
+
+       IPsfetch()
+       ansiblePlaybook credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',extras: "  -e ENV=${ENV} -e ENVAPP=${envapp} -e ENVIRONMENT=${environment} -e ENVIRONMENTTAG=${environmenttag} -e APP=${params.APP}  -e BUILD_NUMBER=${p_build_number} -e SCRIPTHOST=${SCRIPTHOST}",  installation: 'ansible-2.6.5', playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/LoadBalancer.yml'
+       ALB_DNS_NAME()
+       
+}
+
+void UpdateDNS() {
+       
+       ansiblePlaybook credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',extras: " -e ENVAPP=${envapp} -e ENVIRONMENT=${environment} -e ENVIRONMENTTAG=${environmenttag} -e APP=${params.APP}  -e BUILD_NUMBER=${p_build_number} -e SCRIPTHOST=${SCRIPTHOST}",  installation: 'ansible-2.6.5', playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/UpdateDNS.yml'
+       LB_DNS()
+       HOST_DNS()
+}
+
+void ALB_DNS_NAME() {
+      script {
+           
+          //def exists = fileExists '/var/tmp/${envapp}-${p_build_number}'
+          //if (exists) {
+           if (fileExists("/var/tmp/${envapp}-${p_build_number}")) {
+          
+             ALB_DNS_NAME = readFile("/var/tmp/${envapp}-${p_build_number}")
+             echo "${ALB_DNS_NAME} is alb_dns_name"
+             
+          } else {
+          
+             ALB_DNS_NAME = 'NA'
+          
+          }
+          
+      }
+}
+
+void LB_DNS() {
+      script {
+           
+           if (fileExists("/var/tmp/${envapp}-${p_build_number}-LB_DNS")) {
+          
+             LB_DNS = readFile("/var/tmp/${envapp}-${p_build_number}-LB_DNS")
+             echo "${LB_DNS} is LB_DNS output"
+             
+          } else {
+          
+             LB_DNS = 'NA'
+          
+          }
+          
+      }
+}
+
+void HOST_DNS() {
+      script {
+           
+           if (fileExists("/var/tmp/${envapp}-${p_build_number}-HOST_DNS")) {
+          
+             HOST_DNS = readFile("/var/tmp/${envapp}-${p_build_number}-HOST_DNS")
+             echo "${HOST_DNS} is HOST_DNS output"
+             
+          } else {
+          
+             HOST_DNS = 'NA'
+          
+          }
+          
+      }
+}
+
+void deletion() {
+          echo "${p_build_number} is build_number"
+          wrap([$class: 'BuildUser']) {
+            sh 'echo "${BUILD_USER}"'
+          ansiblePlaybook credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',extras: "-e ENVAPP=${envapp} -e OS=${OS} -e Region=${params.REGION} -e BUILDUSERML=${BUILD_USER_EMAIL} -e ENVIRONMENT=${environment} -e APP=${params.APP} -e DLBUILD_NUMBER=${currentBuild.number} -e BUILD_NUMBER=${params.InputBuildNumber}  -e SCRIPTHOST=${SCRIPTHOST} ",  installation: 'ansible-2.6.5', playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/Resources_Deletion.yml'
+          }  
+       
+}
+
+void deletionFL() {
+          echo "${p_build_number} is build_number"
+          wrap([$class: 'BuildUser']) {
+            sh 'echo "${BUILD_USER}"'
+          ansiblePlaybook credentialsId: '5a621388-8810-4ec5-99fc-193435432cfd',extras: "-e ENVAPP=${envapp} -e  OS=${OS} -e BUILDUSERML=${BUILD_USER_EMAIL} -e ENVIRONMENT=${environment} -e APP=${params.APP}  -e DLBUILD_NUMBER=${currentBuild.number} -e BUILD_NUMBER=${currentBuild.number}  -e SCRIPTHOST=${SCRIPTHOST} ",  installation: 'ansible-2.6.5', playbook: '${JENKINS_HOME}/workspace/${Job_Name}/ansible/infra/DeletionJob.yml'  
+          }  
+       
+}
+
+void mail_list() {
+    script {
+        def Application = "${params.APP}".split("-")[0]
+        def APPENV = "$Application${params.ENVIRONMENT}"
+        if ( APPENV != '' ){ 
+            dl_map = [
+                "ACFSDEV": "ACFSDev@spglobal.com", "ACFSQA": "ACFSQA@spglobal.com", "ACFSUAT": "ACFSQA@spglobal.com", "ACFSPROD": "ACFSSupport@spglobal.com", "ACFSDR": "ACFSSupport@spglobal.com",
+                "ARROWDEV": "arrowdevteam@spglobal.com", "ARROWQA": "SPDJIITQA@spdji.com", "ARROWUAT": "SPDJIITQA@spdji.com", "ARROWPROD": "ARROWSupport@spglobal.com", "ARROWDR": "ARROWSupport@spglobal.com",
+                "AURADEV": "AURAdev@spglobal.com", "AURAQA": "SPDJIITQA@spdji.com", "AURAPROD": "AURAsupport@spglobal.com", "AURADR": "AURAsupport@spglobal.com", 
+                "CAREDEV": "CareDevTeam@spglobal.com", "CAREQA": "CareQA@spglobal.com", "CAREPROD": "CARE_Support@spglobal.com", "CAREDR": "CARE_Support@spglobal.com",
+                "CIPDEV": "CIP_TEAM@spglobal.com", "CIPQA": "CIP_TEAM@spglobal.com", "CIPPREPROD": "CIPSupport@spglobal.com", "CIPPROD": "CIPSupport@spglobal.com", "CIPDR": "CIPSupport@spglobal.com", 
+                "FIERCEDEV": "FIERCEDevelopment@spglobal.com", "FIERCEQA": "FierceQATeam@spglobal.com", "FIERCEUAT": "FierceQATeam@spglobal.com", "FIERCEPREPROD": "FIERCESupport@spglobal.com", "FIERCEPROD": "FIERCESupport@spglobal.com", "FIERCEDR": "FIERCESupport@spglobal.com", 
+                "GRIPDEV": "GRIPDev@spglobal.com", "GRIPQA": "GRIPQA@spglobal.com", "GRIPPROD": "GRIPSupport@spglobal.com", "GRIPDR": "GRIPSupport@spglobal.com",
+                "INFRATESTPROD": "laxma.reddy.sheelam@spglobal.com", "INFRATESTDR": "laxma.reddy.sheelam@spglobal.com", "INFRATESTPREPROD": "laxma.reddy.sheelam@spglobal.com",
+                "INFRADEV": "indexinfrastructure@spglobal.com", "INFRAQA": "indexinfrastructure@spglobal.com", "INFRAUAT": "indexinfrastructure@spglobal.com", 
+                "INFRAPROD": "laxma.reddy.sheelam@spglobal.com", "INFRADR": "laxma.reddy.sheelam@spglobal.com", "INFRAPREPROD": "laxma.reddy.sheelam@spglobal.com",
+                "IDSDEV": "IDSDevelopmentTeam@spglobal.com", "IDSQA": "IDSQATeam@spglobal.com", "IDSUAT": "IDSQATeam@spglobal.com", "IDSPROD": "IDSSupport@spglobal.com", "IDSDR": "IDSSupport@spglobal.com",
+                "ILSDEV": "ILSDev@spglobal.com", "ILSQA": "ILSQA@spglobal.com", "ILSPROD": "ILSSupport@spglobal.com",
+                "KENSTARDEV": "KenstarDev@spglobal.com", "KENSTARQA": "KenstarQA@spglobal.com", "KENSTARUAT": "KenstarQA@spglobal.com", "KENSTARPROD": "KenstarSupport@spglobal.com", "KENSTARDR": "KenstarSupport@spglobal.com",
+		"KENSTARPROD2": "KenstarSupport@spglobal.com","KENSTARPREPROD2": "KenstarSupport@spglobal.com", "KENSTARDR2": "KenstarSupport@spglobal.com",
+                "MDBDEV": "MDBTeam@spglobal.com", "MDBQA": "MDBTeam@spglobal.com", "MDBUAT": "MDBTeam@spglobal.com", "MDBPREPROD": "MDBSupport@spglobal.com", "MDBPROD": "MDBSupport@spglobal.com", "MDBDR": "MDBSupport@spglobal.com", 
+                "SCOREDEV": "scoredev@spglobal.com", "SCOREQA":"SPDJIITQA@spdji.com", "SCOREPROD": "scoredev@spglobal.com", "SCOREDR": "scoredev@spglobal.com",
+                "SPDJIBLOGSDEV": "IDSDevelopmentTeam@spglobal.com", "SPDJIBLOGSQA": "SPDJIITQA@spdji.com", "SPDJIBLOGSUAT": "SPDJIITQA@spdji.com", "SPDJIBLOGSPROD": "spdjiblogssupport@spglobal.com", "SPDJIBLOGSDR": "spdjiblogssupport@spglobal.com",
+                "SPDJIVAULTDEV": "IDSDevelopmentTeam@spglobal.com", "SPDJIVAULTQA": "SPDJIITQA@spdji.com", "SPDJIVAULTPROD": "spdjiblogssupport@spglobal.com", "SPDJIVAULTDR": "spdjiblogssupport@spglobal.com",
+                "SPIDERDEV": "SpiderDevelopment@spglobal.com", "SPIDERQA": "SpiderQA@spglobal.com", "SPIDERPREPROD": "SPIDERSupport@spglobal.com", "SPIDERPROD": "SPIDERSupport@spglobal.com", "SPIDERDR": "SPIDERSupport@spglobal.com",
+		"SPROUTPREPROD": "sproutsupport@spglobal.com", "SPROUTDR": "sproutsupport@spglobal.com", "SPROUTPROD": "sproutsupport@spglobal.com",
+		"T3DEV1": "T3DevelopmentTeam@spglobal.com", "T3DEV2": "T3DevelopmentTeam@spglobal.com", "T3QA1": "T3QATeam@spglobal.com", "T3QA2": "T3QATeam@spglobal.com", "T3PRODFIX": "T3support@spglobal.com", "T3PREPROD1": "T3support@spglobal.com", "T3PREPROD": "T3support@spglobal.com", "T3PROD": "T3support@spglobal.com", "T3DR": "T3support@spglobal.com"]
+                
+            mail_id = dl_map.find{ it.key == APPENV }?.value
+        }
+        else {
+            echo "Please ensure to select Application and Environment"
+
+        }
+    }
+}
+properties ([
+    parameters ([
+    
+		 [$class: 'ChoiceParameter',
+			choiceType: 'PT_SINGLE_SELECT',
+			description: 'Please choose REGION\nUSE1= N. Virginia: USW2= Oregon: EUW1= Ireland',
+			filterable: 'false',
+			name: 'REGION',
+			script: [
+				$class: 'GroovyScript',
+				fallbackScript: [
+					classpath: [],
+					sandbox: 'false',
+					script:
+						"return['Could not get REGION List']"
+						],
+				script: [
+					classpath:[],
+					sandbox: 'false',
+					script:
+						"return['USE1','USW2','EUW1']"
+					]
+				]
+			],
+
+		 [$class: 'CascadeChoiceParameter',
+			choiceType: 'PT_SINGLE_SELECT',
+			description: 'Please select Environment from the list',
+			filterable: 'false',
+			referencedParameters: 'REGION',
+			name: 'ENVIRONMENT',
+			script: [
+				$class: 'GroovyScript',
+				fallbackScript: [
+					classpath: [],
+					sandbox: 'false',
+					script:
+						"return['Could not get Environment List']"
+						],
+				script: [
+					classpath:[],
+					sandbox: 'false',
+					script:'''
+                        			if (REGION.equals("USE1")) {
+							return ["PREPROD","PROD","PROD2"]
+						} else if (REGION.equals("USW2")) {
+							return ["PREPROD","DR","DR2"]
+						} else if (REGION.equals("EUW1")) {
+							return ["PROD"]
+						}
+					  '''
+					]
+				]
+			],       
+
+         extendedChoice( 
+            defaultValue: '', 
+            description: 'Please select Application name', 
+            multiSelectDelimiter: ',', 
+            name: 'APP', 
+            quoteValue: false, 
+            saveJSONParameterToFile: false, 
+            type: 'PT_SINGLE_SELECT', 
+            visibleItemCount: 10,
+    		    groovyScript: """
+            import hudson.model.*
+            import jenkins.model.*
+            
+            def userid = User.current().id
+            def groups = Jenkins.instance.securityRealm.loadUserByUsername(userid)
+                        .authorities.collect{a -> a.authority}
+            
+            //print groups
+            
+            List <String> appList = new ArrayList<>()
+            for(group in groups) {
+                def appMap = ["acfssupport": "ACFS", "aurasupport": "AURA", "caresupport": "CARE", "cipsupport": "CIP", "fiercesupport": "FIERCE,FIERCE-Mongo-CNF,FIERCE-Mongo-DBN,FIERCE-Mongo-MMS,FIERCE-Mongo-MMSDB,FIERCE-Mongo-S", "sproutsupport": "SPROUT-Mongo-DBN,SPROUT-Mongo-OPS,SPROUT-Mongo-CNF",
+                              "gripsupport": "GRIP", "ilssupport": "ILS", "kenstarsupport": "KENSTAR", "mdbsupport": "MDB", "scoresupport": "SCORE",
+                              "spidersupport": "SPIDER", "t3support": "T3", "spdjiarrowsupport": "ARROW-SOLR,ARROW-ZOOKEEPER,ARROW-HAZELCAST,ARROW-HAZELCAST-MANCENTER,ARROW-RIPA-DOCKER,ARROW-SPRINGBOOT,DATA DICTIONARY","spdjiblogssupport": "SPDJIBLOGS,SPDJIDataServices","spdjiidssupport": "IDS-APACHE,IDS-TOMCAT","spdjispicesupport": "SPICE","spdjivaultsupport": "SPVAULT","spdjivdesupport": "SPVDE",
+                              "spsysadmin":"INFRATEST,INFRA,EDM"]
+                def appName = appMap.find{ it.key == group }?.value
+                if (appName) {
+                  appList.add(appName)
+                }
+              }
+            return appList.unique()"""
+    		),
+    
+
+		 [$class: 'ChoiceParameter',
+			choiceType: 'PT_SINGLE_SELECT',
+			description: 'Please select AMI',
+			filterable: 'false',
+			name: 'AMI',
+			script: [
+				$class: 'GroovyScript',
+				fallbackScript: [
+					classpath: [],
+					sandbox: 'false',
+					script:
+						"return['Could not get AMI List']"
+						],
+				script: [
+					classpath:[],
+					sandbox: 'false',
+					script:
+						"return['RHEL8-CurrentMonth','RHEL8-PreviousMonth']"
+					]
+				]
+			],
+			
+		 [$class: 'CascadeChoiceParameter',
+			choiceType: 'PT_CHECKBOX',
+			description: 'VirtualMachine: Creates new VMs',
+			name: 'Create',
+			script: [
+				$class: 'GroovyScript',
+				fallbackScript: [
+					classpath: [],
+					sandbox: 'false',
+					script:
+						"return['Could not get Provision List']"
+						],
+				script: [
+					classpath:[],
+					sandbox: 'false',
+					script:
+						"return['VirtualMachine','LoadBalancer','UpdateDNS']"
+					]
+				]
+			],			
+
+		 [$class: 'CascadeChoiceParameter',
+			choiceType: 'PT_CHECKBOX',
+			description: 'Decomission: Delete VMs',
+			name: 'Destroy',
+			script: [
+				$class: 'GroovyScript',
+				fallbackScript: [
+					classpath: [],
+					sandbox: 'false',
+					script:
+						"return['Could not get Destroy List']"
+						],
+				script: [
+					classpath:[],
+					sandbox: 'false',
+					script:
+						"return['Decommission']"
+					]
+				]
+			],
+
+
+		[$class: 'DynamicReferenceParameter',
+			choiceType: 'ET_FORMATTED_HTML',
+			description: 'Build Number is Mandatory for Decomission',
+			omitValueField: true, 
+			name: 'InputBuildNumber',
+			referencedParameters: 'Destroy,Create',
+			script: [
+				$class: 'GroovyScript',
+				fallbackScript: [
+					classpath: [],
+					sandbox: 'false',
+					script: 
+						"return['Script Error']"
+					],
+					script: [
+						classpath: [],
+						sandbox: 'false',
+						script: '''
+						if ((Destroy.equals('Decommission')) || (Create.equals('LoadBalancer')) || (Create.equals('LoadBalancer,UpdateDNS')) || (Create.equals('UpdateDNS'))){                    
+							inputBox = "<input name='value' class='setting-input' type='text'>"
+							return inputBox
+							}
+						else {
+							html="Applicable Only for Decommission, LoadBalancer, UpdateDNS Modules"
+						}
+						'''
+						]
+					]
+				],
+
+		 [$class: 'CascadeChoiceParameter',
+			choiceType: 'PT_SINGLE_SELECT',
+			description: '',
+			filterable: 'false',
+			referencedParameters: 'REGION',
+			name: 'Slave',
+			script: [
+				$class: 'GroovyScript',
+				fallbackScript: [
+					classpath: [],
+					sandbox: 'false',
+					script:
+						"return['Could not get Slave List']"
+						],
+				script: [
+					classpath:[],
+					sandbox: 'false',
+					script:'''
+					if (REGION.equals("USE1")) {
+                        return ["USE1-SLAVE-01","USW2-SLAVE-01"]
+                      } else if (REGION.equals("USW2")) {
+                        return ["USW2-SLAVE-01","USE1-SLAVE-01"]
+                      } else if (REGION.equals("EUW1")) {
+                        return ["USE1-SLAVE-01","USW2-SLAVE-01"]
+                      } else {
+                        return ["USE1-SLAVE-01","USW2-SLAVE-01"]
+                      }
+					  '''
+					]
+				]
+			]
+    ])
+])
